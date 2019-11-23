@@ -50,10 +50,15 @@ public:
 		return array[index];
 	}
 
-	//T& operator*() const
-	//{
-	//	return array;
-	//}
+	int* begin() const
+	{
+		return array;
+	}
+
+	int* end() const
+	{
+		return array + length;
+	}
 };
 
 struct SumsData
@@ -281,16 +286,12 @@ Result CreateCollisionAvoidanceArray(span<int> sortedSums, BestSumsData bestData
 	SumsData sumData = bestData.Data;
 
 	int highestSum = sortedSums[sortedSums.length - 1] + 1;
-	std::unordered_set<int> filteredSums;
+	std::unordered_set<int> filteredSums(sortedSums.begin(), sortedSums.end());
 
-	for (int i = 0; i < sortedSums.length; i++)
+	for (auto q = sumData.Uniques->begin(); q != sumData.Uniques->end(); q++)
 	{
-		int sum = sortedSums[i];
-		if (sumData.Uniques->find(sum) != sumData.Uniques->end())
-		{
-			continue;
-		}
-		filteredSums.insert(sum);
+		int uniqueNumber = *q;
+		filteredSums.erase(uniqueNumber);
 	}
 
 	for (int i = 1; i <= highestSum; i++)

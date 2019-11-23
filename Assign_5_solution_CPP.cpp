@@ -13,7 +13,9 @@
 template<typename T>
 struct span
 {
+private:
 	T* array;
+public:
 	int length;
 
 	span(T* arr, int len) : array(arr), length(len)
@@ -28,14 +30,34 @@ struct span
 	{
 	}
 
-	span<T> slice(int startIndex, int len)
+	span<T> slice(int startIndex, int len) const
 	{
 		return span<T>(&(array[startIndex]), len);
 	}
 
-	span<T> slice(int startIndex)
+	span<T> slice(int startIndex) const
 	{
 		return span<T>(&(array[startIndex]), length - startIndex);
+	}
+
+	void copyTo(span<T>& other) const
+	{
+		std::copy(array, array + length, other.array);
+	}
+
+	T& operator[](int index) const
+	{
+		return array[index];
+	}
+
+	int* begin() const
+	{
+		return array;
+	}
+
+	int* end() const
+	{
+		return array + length;
 	}
 };
 
@@ -101,7 +123,7 @@ int BoolArrayTrueCount(span<char> array)
 	int trueCount = 0;
 	for (int i = 0; i < array.length; i++)
 	{
-		trueCount += array.array[i];
+		trueCount += array[i];
 	}
 
 	return trueCount;
@@ -112,20 +134,20 @@ span<char> CreatePartialSums(span<int> numbers, span<char> currSums)
 	int maxSum = currSums.length;
 	for (int i = 0; i < numbers.length; i++)
 	{
-		maxSum += numbers.array[i];
+		maxSum += numbers[i];
 	}
 
 	span<char> newSums(maxSum);
-	std::copy(currSums.array, currSums.array + currSums.length, newSums.array);
+	currSums.copyTo(newSums);
 
 	int prevMaxSum = currSums.length - 1;
 	for (int i = 0; i < numbers.length; i++)
 	{
 		for (int z = prevMaxSum; z >= 0; z--)
 		{
-			newSums.array[z + numbers.array[i]] |= newSums.array[z];
+			newSums[z + numbers[i]] |= newSums[z];
 		}
-		prevMaxSum += numbers.array[i];
+		prevMaxSum += numbers[i];
 	}
 
 	return newSums;
@@ -138,14 +160,14 @@ SumsData FinishCreateSumsData(int number, span<char> currSums)
 
 	for (int i = 0; i < currSums.length; i++)
 	{
-		if (currSums.array[i] == 1)
+		if (currSums[i] == 1)
 		{
 			int newSum = i + number;
 			if (newSum >= currSums.length)
 			{
 				uniques->insert(newSum);
 			}
-			else if (currSums.array[newSum] == 0)
+			else if (currSums[newSum] == 0)
 			{
 				uniques->insert(newSum);
 			}
@@ -159,7 +181,7 @@ SumsData FinishCreateSumsData(int number, span<char> currSums)
 void CreateAllSums(int number, span<char> currSums, PartialSumsData& data)
 {
 	span<int> dwa(1);
-	dwa.array[0] = number;
+	dwa[0] = number;
 
 	span<char> allSums = CreatePartialSums(dwa, currSums);
 	data.sumsCount = BoolArrayTrueCount(allSums);
@@ -168,9 +190,9 @@ void CreateAllSums(int number, span<char> currSums, PartialSumsData& data)
 	int sumsIndex = 0;
 	for (int i = 1; i < allSums.length; i++)
 	{
-		if (allSums.array[i] == 1)
+		if (allSums[i] == 1)
 		{
-			data.sums.array[sumsIndex++] = i;
+			data.sums[sumsIndex++] = i;
 		}
 	}
 }
@@ -209,7 +231,7 @@ void CreateAllSumsDatas(span<int> numbers, span<char> currSums, PartialSumsData&
 			return;
 		}
 
-		int number = numbers.array[0];
+		int number = numbers[0];
 		if (data.foundData->find(number) == data.foundData->end())
 		{
 			BestSumsData newData(number, FinishCreateSumsData(number, currSums));
@@ -236,24 +258,24 @@ int GetFirstReplicateIndex(span<int> numbers)
 	int maxSum = 1;
 	for (int i = 0; i < numbers.length; i++)
 	{
-		maxSum += numbers.array[i];
+		maxSum += numbers[i];
 	}
 
 	span<char> newSums(maxSum);
-	newSums.array[0] = true;
+	newSums[0] = true;
 
 	int prevMaxSum = 0;
 	for (int i = 0; i < numbers.length; i++)
 	{
-		if (newSums.array[numbers.array[i]])
+		if (newSums[numbers[i]])
 		{
 			return i;
 		}
 		for (int z = prevMaxSum; z >= 0; z--)
 		{
-			newSums.array[z + numbers.array[i]] |= newSums.array[z];
+			newSums[z + numbers[i]] |= newSums[z];
 		}
-		prevMaxSum += numbers.array[i];
+		prevMaxSum += numbers[i];
 	}
 
 	return numbers.length;
@@ -263,17 +285,13 @@ Result CreateCollisionAvoidanceArray(span<int> sortedSums, BestSumsData bestData
 {
 	SumsData sumData = bestData.Data;
 
-	int highestSum = sortedSums.array[sortedSums.length - 1] + 1;
-	std::unordered_set<int> filteredSums;
+	int highestSum = sortedSums[sortedSums.length - 1] + 1;
+	std::unordered_set<int> filteredSums(sortedSums.begin(), sortedSums.end());
 
-	for (int i = 0; i < sortedSums.length; i++)
+	for (auto q = sumData.Uniques->begin(); q != sumData.Uniques->end(); q++)
 	{
-		int sum = sortedSums.array[i];
-		if (sumData.Uniques->find(sum) != sumData.Uniques->end())
-		{
-			continue;
-		}
-		filteredSums.insert(sum);
+		int uniqueNumber = *q;
+		filteredSums.erase(uniqueNumber);
 	}
 
 	for (int i = 1; i <= highestSum; i++)
@@ -313,18 +331,18 @@ Result Solve(span<int> numbers)
 	std::vector<int> temp;
 	for (int i = 0; i < numbers.length; i++)
 	{
-		temp.push_back(numbers.array[i]);
+		temp.push_back(numbers[i]);
 	}
 	std::sort(temp.begin(), temp.end());
 	for (int i = 0; i < numbers.length; i++)
 	{
-		numbers.array[i] = temp[i];
+		numbers[i] = temp[i];
 	}
 
 	int maxCreated = GetFirstReplicateIndex(numbers);
 
 	span<char> currSums = span<char>(1);
-	currSums.array[0] = 1;
+	currSums[0] = 1;
 
 	PartialSumsData data;
 	data.foundData = new std::unordered_set<int>();
@@ -369,7 +387,7 @@ int main()
 		std::string numberAsString = numbersAsString.substr(stringIndex, digitCount);
 
 		int number = std::stoi(numberAsString);
-		numbers.array[index++] = number;
+		numbers[index++] = number;
 		temp.push_back(number);
 
 		stringIndex += digitCount;

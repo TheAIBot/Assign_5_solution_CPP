@@ -64,14 +64,14 @@ struct SumsData
 {
 public:
 	std::vector<int>* NewSums;
-	std::unordered_set<int>* Uniques;
+	std::vector<int>* Uniques;
 	int Replications;
 
-	SumsData(std::vector<int>* newSums, std::unordered_set<int>* uniques) : NewSums(newSums), Uniques(uniques), Replications(newSums->size() - uniques->size())
+	SumsData(std::vector<int>* newSums, std::vector<int>* uniques) : NewSums(newSums), Uniques(uniques), Replications(newSums->size() - uniques->size())
 	{
 	}
 
-	SumsData(std::vector<int>* newSums, std::unordered_set<int>* uniques, int reps) : NewSums(newSums), Uniques(uniques), Replications(reps)
+	SumsData(std::vector<int>* newSums, std::vector<int>* uniques, int reps) : NewSums(newSums), Uniques(uniques), Replications(reps)
 	{
 	}
 };
@@ -155,7 +155,7 @@ span<char> CreatePartialSums(span<int> numbers, span<char> currSums)
 SumsData FinishCreateSumsData(int number, span<char> currSums)
 {
 	std::vector<int>* newSums = new std::vector<int>();
-	std::unordered_set<int>* uniques = new std::unordered_set<int>();
+	std::vector<int>* uniques = new std::vector<int>();
 
 	for (int i = 0; i < currSums.length; i++)
 	{
@@ -164,11 +164,11 @@ SumsData FinishCreateSumsData(int number, span<char> currSums)
 			int newSum = i + number;
 			if (newSum >= currSums.length)
 			{
-				uniques->insert(newSum);
+				uniques->push_back(newSum);
 			}
 			else if (currSums[newSum] == 0)
 			{
-				uniques->insert(newSum);
+				uniques->push_back(newSum);
 			}
 			newSums->push_back(newSum);
 		}

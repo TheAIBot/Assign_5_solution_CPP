@@ -13,9 +13,8 @@
 template<typename T>
 struct span
 {
-private:
-	T* array;
 public:
+	T* array;
 	int length;
 
 	span(T* arr, int len) : array(arr), length(len)
@@ -182,8 +181,9 @@ void CreateAllSums(int number, span<char> currSums, PartialSumsData& data)
 {
 	span<int> dwa(1);
 	dwa[0] = number;
-
 	span<char> allSums = CreatePartialSums(dwa, currSums);
+	delete[] dwa.array;
+
 	data.sumsCount = BoolArrayTrueCount(allSums);
 
 	data.sums = span<int>(data.sumsCount - 1);
@@ -212,6 +212,7 @@ void CreateAllSumsDatas(span<int> numbers, span<char> currSums, PartialSumsData&
 
 		span<char> secondPartSums = CreatePartialSums(secondPart, currSums);
 		CreateAllSumsDatas(firstPart, secondPartSums, data);
+		delete[] secondPartSums.array;
 
 		if (data.created > data.maxCreated)
 		{
@@ -220,6 +221,7 @@ void CreateAllSumsDatas(span<int> numbers, span<char> currSums, PartialSumsData&
 
 		span<char> firstPartSums = CreatePartialSums(firstPart, currSums);
 		CreateAllSumsDatas(secondPart, firstPartSums, data);
+		delete[] firstPartSums.array;
 	}
 	else
 	{
@@ -240,6 +242,11 @@ void CreateAllSumsDatas(span<int> numbers, span<char> currSums, PartialSumsData&
 				(newData.Data.Replications == data.datas.Data.Replications &&
 					newData.Number < data.datas.Number))
 			{
+				if (data.datas.Data.Uniques != nullptr)
+				{
+					delete data.datas.Data.Uniques;
+					delete data.datas.Data.NewSums;
+				}
 				data.datas = newData;
 			}
 
@@ -277,6 +284,7 @@ int GetFirstReplicateIndex(span<int> numbers)
 		}
 		prevMaxSum += numbers[i];
 	}
+	delete[] newSums.array;
 
 	return numbers.length;
 }
@@ -328,16 +336,7 @@ Result CreateCollisionAvoidanceArray(span<int> sortedSums, BestSumsData bestData
 
 Result Solve(span<int> numbers)
 {
-	std::vector<int> temp;
-	for (int i = 0; i < numbers.length; i++)
-	{
-		temp.push_back(numbers[i]);
-	}
-	std::sort(temp.begin(), temp.end());
-	for (int i = 0; i < numbers.length; i++)
-	{
-		numbers[i] = temp[i];
-	}
+	std::sort(numbers.begin(), numbers.end());
 
 	int maxCreated = GetFirstReplicateIndex(numbers);
 
@@ -352,6 +351,8 @@ Result Solve(span<int> numbers)
 	data.maxCreated = maxCreated;
 
 	CreateAllSumsDatas(numbers, currSums, data);
+	delete[] currSums.array;
+	delete data.foundData;
 
 	return CreateCollisionAvoidanceArray(data.sums, data.datas);
 }
@@ -364,7 +365,6 @@ int main()
 	std::cin >> std::ws;
 
 	span<int> numbers(numberCount);
-	std::vector<int> temp;
 
 	std::string numbersAsString;
 	std::getline(std::cin, numbersAsString);
@@ -388,27 +388,13 @@ int main()
 
 		int number = std::stoi(numberAsString);
 		numbers[index++] = number;
-		temp.push_back(number);
 
 		stringIndex += digitCount;
 		stringIndex++;
 	}
 
-	//int[] numbers = new int[] { 7, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 7, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 7, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23, 23, 45, 2, 6, 2, 3, 8, 6, 2, 8, 45, 2, 6, 2, 3, 8, 6, 2, 8, 2, 6, 2, 56, 23, 65, 23 };
-	//int[] numbers = new int[1000];
-	//Random rand = new Random(5263);
-	//for (int i = 0; i < numbers.Length; i++)
-	//{
-	//    //numbers[i] = 20_000;
-	//    numbers[i] = rand.Next(1, 20_001);
-	//}
-
-	//Console.WriteLine(numbers.Length);
-	//Stopwatch watch = new Stopwatch();
-	//watch.Start();
 	Result result = Solve(numbers);
-	//watch.Stop();
-	//Console.WriteLine($"Time: {watch.ElapsedMilliseconds}");
+	delete[] numbers.array;
 
 	std::cout << result.Number << std::endl;
 	std::cout << result.NewNumber << std::endl;

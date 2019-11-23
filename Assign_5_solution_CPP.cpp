@@ -8,7 +8,7 @@
 #include <limits>
 #include <string>
 #include <sstream>
-#include <cctype>>
+#include <cctype>
 
 template<typename T>
 struct span

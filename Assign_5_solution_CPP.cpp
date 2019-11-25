@@ -21,6 +21,10 @@ public:
 	{
 	}
 
+	span(T* arr, int len, bool nothing) : array(arr), length(len)
+	{
+	}
+
 	span(int len) : array(new T[len]()), length(len)
 	{
 	}

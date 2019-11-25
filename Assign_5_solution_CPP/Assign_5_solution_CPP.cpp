@@ -114,7 +114,7 @@ public:
 	int sumsCount;
 	int created;
 	int maxCreated;
-	span<int> sums;
+	span<char> sums;
 
 	PartialSumsData()
 	{
@@ -185,20 +185,10 @@ void CreateAllSums(int number, span<char> currSums, PartialSumsData& data)
 {
 	span<int> dwa(1);
 	dwa[0] = number;
-	span<char> allSums = CreatePartialSums(dwa, currSums);
+	data.sums = CreatePartialSums(dwa, currSums);
 	delete[] dwa.array;
 
-	data.sumsCount = BoolArrayTrueCount(allSums);
-
-	data.sums = span<int>(data.sumsCount - 1);
-	int sumsIndex = 0;
-	for (int i = 1; i < allSums.length; i++)
-	{
-		if (allSums[i] == 1)
-		{
-			data.sums[sumsIndex++] = i;
-		}
-	}
+	data.sumsCount = BoolArrayTrueCount(data.sums);
 }
 
 void CreateAllSumsDatas(span<int> numbers, span<char> currSums, PartialSumsData& data)
@@ -293,21 +283,17 @@ int GetFirstReplicateIndex(span<int> numbers)
 	return numbers.length;
 }
 
-Result CreateCollisionAvoidanceArray(span<int> sortedSums, BestSumsData bestData)
+Result CreateCollisionAvoidanceArray(span<char> sums, BestSumsData bestData)
 {
 	SumsData sumData = bestData.Data;
-
-	int highestSum = sortedSums[sortedSums.length - 1] + 1;
-
-	std::unordered_set<int> filteredSums(sortedSums.begin(), sortedSums.end());
 
 	for (auto q = sumData.Uniques->begin(); q != sumData.Uniques->end(); q++)
 	{
 		int uniqueNumber = *q;
-		filteredSums.erase(uniqueNumber);
+		sums[uniqueNumber] = 0;
 	}
 
-	for (int i = 1; i <= highestSum; i++)
+	for (int i = 1; i <= sums.length;)
 	{
 		bool foundObstacle = false;
 		for (auto q = sumData.NewSums->begin(); q != sumData.NewSums->end(); q++)
@@ -315,16 +301,16 @@ Result CreateCollisionAvoidanceArray(span<int> sortedSums, BestSumsData bestData
 			int newSum = *q;
 
 			int overlapIndex = newSum - (bestData.Number - i);
-			if (filteredSums.find(overlapIndex) != filteredSums.end())
+			int offset = 0;
+			while (overlapIndex + offset < sums.length && sums[overlapIndex + offset] == 1)
 			{
-				int offset = 0;
-				while (filteredSums.find(overlapIndex + offset + 1) != filteredSums.end())
-				{
-					offset++;
-				}
+				offset++;
+			}
 
-				i += offset;
+			i += offset;
 
+			if (offset > 0)
+			{
 				foundObstacle = true;
 				break;
 			}

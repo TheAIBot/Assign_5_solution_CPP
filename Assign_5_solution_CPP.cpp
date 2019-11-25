@@ -294,6 +294,7 @@ Result CreateCollisionAvoidanceArray(span<int> sortedSums, BestSumsData bestData
 	SumsData sumData = bestData.Data;
 
 	int highestSum = sortedSums[sortedSums.length - 1] + 1;
+
 	std::unordered_set<int> filteredSums(sortedSums.begin(), sortedSums.end());
 
 	for (auto q = sumData.Uniques->begin(); q != sumData.Uniques->end(); q++)
@@ -312,17 +313,17 @@ Result CreateCollisionAvoidanceArray(span<int> sortedSums, BestSumsData bestData
 			int overlapIndex = newSum - (bestData.Number - i);
 			if (filteredSums.find(overlapIndex) != filteredSums.end())
 			{
+				int offset = 0;
+				while (filteredSums.find(overlapIndex + offset + 1) != filteredSums.end())
+				{
+					offset++;
+				}
+
+				i += offset;
+
 				foundObstacle = true;
 				break;
 			}
-
-			int offset = 0;
-			while (filteredSums.find(overlapIndex + offset) != filteredSums.end())
-			{
-				offset++;
-			}
-
-			i += offset;
 		}
 
 		if (!foundObstacle)

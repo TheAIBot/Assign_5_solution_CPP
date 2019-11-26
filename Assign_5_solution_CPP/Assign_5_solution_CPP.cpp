@@ -9,6 +9,7 @@
 #include <string>
 #include <sstream>
 #include <cctype>
+#include <cstdint>
 
 template<typename T>
 struct span
@@ -64,6 +65,89 @@ public:
 	}
 };
 
+struct bitIndices
+{
+public:
+	int byteIndex;
+	int bitIndex;
+
+	bitIndices(int index)
+	{
+		byteIndex = index >> 3;
+		bitIndex = index & 0b0000'0111;
+	}
+};
+
+struct bitArraySlim
+{
+private:
+	uint8_t* array;
+	int arrayLength;
+public:
+	int length;
+
+	bitArraySlim(int len)
+	{
+		length = len;
+		arrayLength = (length / 8) + 1;
+		array = new uint8_t[arrayLength]();
+	}
+
+	void copyTo(bitArraySlim& other) const
+	{
+		std::copy(array, array + arrayLength, other.array);
+	}
+
+	int size() const
+	{
+		return length;
+	}
+
+	int getActualSize() const
+	{
+		return arrayLength;
+	}
+
+	uint8_t operator[](int index) const
+	{
+		int byteIndex = index >> 3;
+		int bitIndex = index & 0b0000'0111;
+
+		return (array[byteIndex] >> bitIndex) & 1;
+	}
+
+	void set(int index, uint8_t value)
+	{
+		int byteIndex = index >> 3;
+		int bitIndex = index & 0b0000'0111;
+
+		array[byteIndex] |= value << bitIndex;
+	}
+
+	void forceSet(int index, uint8_t value)
+	{
+		int byteIndex = index >> 3;
+		int bitIndex = index & 0b0000'0111;
+
+		array[byteIndex] ^= (-value ^ array[byteIndex]) & (1 << bitIndex);
+	}
+
+	uint8_t* begin() const
+	{
+		return array;
+	}
+
+	uint8_t* end() const
+	{
+		return array + arrayLength;
+	}
+
+	~bitArraySlim()
+	{
+		delete[] array;
+	}
+};
+
 struct SumsData
 {
 public:
@@ -114,14 +198,14 @@ public:
 	int sumsCount;
 	int created;
 	int maxCreated;
-	std::vector<bool>* sums;
+	bitArraySlim* sums;
 
 	PartialSumsData()
 	{
 	}
 };
 
-int BoolArrayTrueCount(std::vector<bool>& array)
+int BoolArrayTrueCount(bitArraySlim& array)
 {
 	int trueCount = 0;
 	for (int i = 0; i < array.size(); i++)
@@ -132,7 +216,7 @@ int BoolArrayTrueCount(std::vector<bool>& array)
 	return trueCount;
 }
 
-std::vector<bool>* CreatePartialSums(span<int> numbers, std::vector<bool>& currSums)
+bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 {
 	int maxSum = currSums.size();
 	for (int i = 0; i < numbers.length; i++)
@@ -140,15 +224,32 @@ std::vector<bool>* CreatePartialSums(span<int> numbers, std::vector<bool>& currS
 		maxSum += numbers[i];
 	}
 
-	std::vector<bool>* newSums = new std::vector<bool>(maxSum);
-	std::copy(currSums.begin(), currSums.end(), newSums->begin());
+	bitArraySlim* newSums = new bitArraySlim(maxSum);
+	currSums.copyTo(*newSums);
 
 	int prevMaxSum = currSums.size() - 1;
 	for (int i = 0; i < numbers.length; i++)
 	{
-		for (int z = prevMaxSum; z >= 0; z--)
+		int z = prevMaxSum;
+		for (; z >= 64; z -= (64 - 8))
 		{
-			(*newSums)[z + numbers[i]] = (*newSums)[z + numbers[i]] | (*newSums)[z];
+			bitIndices indicesFromSum(z);
+			bitIndices indicesFromNewSum(z + numbers[i]);
+
+			uint64_t* sumULongPtr = (uint64_t*)(newSums->begin() + indicesFromSum.byteIndex - 8 + 1);
+			uint64_t* newSumULongPtr = (uint64_t*)(newSums->begin() + indicesFromNewSum.byteIndex - 8 + 1);
+
+			uint64_t fromSum = ((*sumULongPtr) >> indicesFromSum.bitIndex) << indicesFromNewSum.bitIndex;
+
+			*newSumULongPtr |= fromSum;
+
+			//((uint64_t*)(newSums->begin() + indicesFromNewSum.byteIndex)) = fromSum;
+
+		}
+
+		for (; z >= 0; z--)
+		{
+			newSums->set(z + numbers[i], (*newSums)[z]);
 		}
 		prevMaxSum += numbers[i];
 	}
@@ -156,7 +257,7 @@ std::vector<bool>* CreatePartialSums(span<int> numbers, std::vector<bool>& currS
 	return newSums;
 }
 
-SumsData FinishCreateSumsData(int number, std::vector<bool>& currSums)
+SumsData FinishCreateSumsData(int number, bitArraySlim& currSums)
 {
 	std::vector<int>* newSums = new std::vector<int>();
 	std::vector<int>* uniques = new std::vector<int>();
@@ -181,7 +282,7 @@ SumsData FinishCreateSumsData(int number, std::vector<bool>& currSums)
 	return SumsData(newSums, uniques);
 }
 
-void CreateAllSums(int number, std::vector<bool>& currSums, PartialSumsData& data)
+void CreateAllSums(int number, bitArraySlim& currSums, PartialSumsData& data)
 {
 	span<int> dwa(1);
 	dwa[0] = number;
@@ -191,7 +292,7 @@ void CreateAllSums(int number, std::vector<bool>& currSums, PartialSumsData& dat
 	data.sumsCount = BoolArrayTrueCount(*data.sums);
 }
 
-void CreateAllSumsDatas(span<int> numbers, std::vector<bool>& currSums, PartialSumsData& data)
+void CreateAllSumsDatas(span<int> numbers, bitArraySlim& currSums, PartialSumsData& data)
 {
 	if (numbers.length > 1)
 	{
@@ -204,7 +305,7 @@ void CreateAllSumsDatas(span<int> numbers, std::vector<bool>& currSums, PartialS
 			return;
 		}
 
-		std::vector<bool>* secondPartSums = CreatePartialSums(secondPart, currSums);
+		bitArraySlim* secondPartSums = CreatePartialSums(secondPart, currSums);
 		CreateAllSumsDatas(firstPart, *secondPartSums, data);
 		delete secondPartSums;
 
@@ -213,7 +314,7 @@ void CreateAllSumsDatas(span<int> numbers, std::vector<bool>& currSums, PartialS
 			return;
 		}
 
-		std::vector<bool>* firstPartSums = CreatePartialSums(firstPart, currSums);
+		bitArraySlim* firstPartSums = CreatePartialSums(firstPart, currSums);
 		CreateAllSumsDatas(secondPart, *firstPartSums, data);
 		delete firstPartSums;
 	}
@@ -283,14 +384,14 @@ int GetFirstReplicateIndex(span<int> numbers)
 	return numbers.length;
 }
 
-Result CreateCollisionAvoidanceArray(std::vector<bool>& sums, BestSumsData bestData)
+Result CreateCollisionAvoidanceArray(bitArraySlim& sums, BestSumsData bestData)
 {
 	SumsData sumData = bestData.Data;
 
 	for (auto q = sumData.Uniques->begin(); q != sumData.Uniques->end(); q++)
 	{
 		int uniqueNumber = *q;
-		sums[uniqueNumber] = 0;
+		sums.forceSet(uniqueNumber, 0);
 	}
 
 	for (int i = 1; i <= sums.size();)
@@ -331,8 +432,8 @@ Result Solve(span<int> numbers)
 
 	int maxCreated = GetFirstReplicateIndex(numbers);
 
-	std::vector<bool>* currSums = new std::vector<bool>();
-	currSums->push_back(1);
+	bitArraySlim* currSums = new bitArraySlim(1);
+	currSums->forceSet(0, 1);
 
 	PartialSumsData data;
 	data.foundData = new std::unordered_set<int>();

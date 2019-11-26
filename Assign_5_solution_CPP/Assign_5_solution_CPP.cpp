@@ -114,17 +114,17 @@ public:
 	int sumsCount;
 	int created;
 	int maxCreated;
-	span<char> sums;
+	std::vector<bool>* sums;
 
 	PartialSumsData()
 	{
 	}
 };
 
-int BoolArrayTrueCount(span<char> array)
+int BoolArrayTrueCount(std::vector<bool>& array)
 {
 	int trueCount = 0;
-	for (int i = 0; i < array.length; i++)
+	for (int i = 0; i < array.size(); i++)
 	{
 		trueCount += array[i];
 	}
@@ -132,23 +132,23 @@ int BoolArrayTrueCount(span<char> array)
 	return trueCount;
 }
 
-span<char> CreatePartialSums(span<int> numbers, span<char> currSums)
+std::vector<bool>* CreatePartialSums(span<int> numbers, std::vector<bool>& currSums)
 {
-	int maxSum = currSums.length;
+	int maxSum = currSums.size();
 	for (int i = 0; i < numbers.length; i++)
 	{
 		maxSum += numbers[i];
 	}
 
-	span<char> newSums(maxSum);
-	currSums.copyTo(newSums);
+	std::vector<bool>* newSums = new std::vector<bool>(maxSum);
+	std::copy(currSums.begin(), currSums.end(), newSums->begin());
 
-	int prevMaxSum = currSums.length - 1;
+	int prevMaxSum = currSums.size() - 1;
 	for (int i = 0; i < numbers.length; i++)
 	{
 		for (int z = prevMaxSum; z >= 0; z--)
 		{
-			newSums[z + numbers[i]] |= newSums[z];
+			(*newSums)[z + numbers[i]] = (*newSums)[z + numbers[i]] | (*newSums)[z];
 		}
 		prevMaxSum += numbers[i];
 	}
@@ -156,17 +156,17 @@ span<char> CreatePartialSums(span<int> numbers, span<char> currSums)
 	return newSums;
 }
 
-SumsData FinishCreateSumsData(int number, span<char> currSums)
+SumsData FinishCreateSumsData(int number, std::vector<bool>& currSums)
 {
 	std::vector<int>* newSums = new std::vector<int>();
 	std::vector<int>* uniques = new std::vector<int>();
 
-	for (int i = 0; i < currSums.length; i++)
+	for (int i = 0; i < currSums.size(); i++)
 	{
 		if (currSums[i] == 1)
 		{
 			int newSum = i + number;
-			if (newSum >= currSums.length)
+			if (newSum >= currSums.size())
 			{
 				uniques->push_back(newSum);
 			}
@@ -181,17 +181,17 @@ SumsData FinishCreateSumsData(int number, span<char> currSums)
 	return SumsData(newSums, uniques);
 }
 
-void CreateAllSums(int number, span<char> currSums, PartialSumsData& data)
+void CreateAllSums(int number, std::vector<bool>& currSums, PartialSumsData& data)
 {
 	span<int> dwa(1);
 	dwa[0] = number;
 	data.sums = CreatePartialSums(dwa, currSums);
 	delete[] dwa.array;
 
-	data.sumsCount = BoolArrayTrueCount(data.sums);
+	data.sumsCount = BoolArrayTrueCount(*data.sums);
 }
 
-void CreateAllSumsDatas(span<int> numbers, span<char> currSums, PartialSumsData& data)
+void CreateAllSumsDatas(span<int> numbers, std::vector<bool>& currSums, PartialSumsData& data)
 {
 	if (numbers.length > 1)
 	{
@@ -204,18 +204,18 @@ void CreateAllSumsDatas(span<int> numbers, span<char> currSums, PartialSumsData&
 			return;
 		}
 
-		span<char> secondPartSums = CreatePartialSums(secondPart, currSums);
-		CreateAllSumsDatas(firstPart, secondPartSums, data);
-		delete[] secondPartSums.array;
+		std::vector<bool>* secondPartSums = CreatePartialSums(secondPart, currSums);
+		CreateAllSumsDatas(firstPart, *secondPartSums, data);
+		delete secondPartSums;
 
 		if (data.created > data.maxCreated)
 		{
 			return;
 		}
 
-		span<char> firstPartSums = CreatePartialSums(firstPart, currSums);
-		CreateAllSumsDatas(secondPart, firstPartSums, data);
-		delete[] firstPartSums.array;
+		std::vector<bool>* firstPartSums = CreatePartialSums(firstPart, currSums);
+		CreateAllSumsDatas(secondPart, *firstPartSums, data);
+		delete firstPartSums;
 	}
 	else
 	{
@@ -283,7 +283,7 @@ int GetFirstReplicateIndex(span<int> numbers)
 	return numbers.length;
 }
 
-Result CreateCollisionAvoidanceArray(span<char> sums, BestSumsData bestData)
+Result CreateCollisionAvoidanceArray(std::vector<bool>& sums, BestSumsData bestData)
 {
 	SumsData sumData = bestData.Data;
 
@@ -293,7 +293,7 @@ Result CreateCollisionAvoidanceArray(span<char> sums, BestSumsData bestData)
 		sums[uniqueNumber] = 0;
 	}
 
-	for (int i = 1; i <= sums.length;)
+	for (int i = 1; i <= sums.size();)
 	{
 		bool foundObstacle = false;
 		for (auto q = sumData.NewSums->begin(); q != sumData.NewSums->end(); q++)
@@ -302,7 +302,7 @@ Result CreateCollisionAvoidanceArray(span<char> sums, BestSumsData bestData)
 
 			int overlapIndex = newSum - (bestData.Number - i);
 			int offset = 0;
-			while (overlapIndex + offset < sums.length && sums[overlapIndex + offset] == 1)
+			while (overlapIndex + offset < sums.size() && sums[overlapIndex + offset] == 1)
 			{
 				offset++;
 			}
@@ -331,8 +331,8 @@ Result Solve(span<int> numbers)
 
 	int maxCreated = GetFirstReplicateIndex(numbers);
 
-	span<char> currSums = span<char>(1);
-	currSums[0] = 1;
+	std::vector<bool>* currSums = new std::vector<bool>();
+	currSums->push_back(1);
 
 	PartialSumsData data;
 	data.foundData = new std::unordered_set<int>();
@@ -341,11 +341,11 @@ Result Solve(span<int> numbers)
 	data.created = 0;
 	data.maxCreated = maxCreated;
 
-	CreateAllSumsDatas(numbers, currSums, data);
-	delete[] currSums.array;
+	CreateAllSumsDatas(numbers, *currSums, data);
+	delete currSums;
 	delete data.foundData;
 
-	return CreateCollisionAvoidanceArray(data.sums, data.datas);
+	return CreateCollisionAvoidanceArray(*data.sums, data.datas);
 }
 
 int main()

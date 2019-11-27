@@ -183,10 +183,13 @@ public:
 		uniques = std::numeric_limits<int>::max();
 	}
 
-	SumsData ToSumsData(int number)
+	SumsData ToSumsData(int number, int totalSums)
 	{
 		std::vector<int>* newSums = new std::vector<int>();
-		std::vector<int>* uniques = new std::vector<int>();
+		std::vector<int>* uniqasdues = new std::vector<int>();
+
+		newSums->reserve(totalSums);
+		uniqasdues->reserve(uniques);
 
 		for (int i = 0; i < bitArray->size(); i++)
 		{
@@ -195,17 +198,17 @@ public:
 				int newSum = i + number;
 				if (newSum >= bitArray->size())
 				{
-					uniques->push_back(newSum);
+					uniqasdues->push_back(newSum);
 				}
 				else if ((*bitArray)[newSum] == 0)
 				{
-					uniques->push_back(newSum);
+					uniqasdues->push_back(newSum);
 				}
 				newSums->push_back(newSum);
 			}
 		}
 
-		return SumsData(newSums, uniques);
+		return SumsData(newSums, uniqasdues);
 	}
 };
 
@@ -458,9 +461,9 @@ int GetFirstReplicateIndex(span<int> numbers)
 	return numbers.length;
 }
 
-Result CreateCollisionAvoidanceArray(bitArraySlim& sums, BestSumsData bestData)
+Result CreateCollisionAvoidanceArray(bitArraySlim& sums, BestSumsData bestData, PartialSumsData& data)
 {
-	SumsData sumData = bestData.Data.ToSumsData(bestData.Number);
+	SumsData sumData = bestData.Data.ToSumsData(bestData.Number, data.sumsCount);
 
 	for (auto q = sumData.Uniques->begin(); q != sumData.Uniques->end(); q++)
 	{
@@ -520,7 +523,7 @@ Result Solve(span<int> numbers)
 	delete currSums;
 	delete data.foundData;
 
-	return CreateCollisionAvoidanceArray(*data.sums, data.datas);
+	return CreateCollisionAvoidanceArray(*data.sums, data.datas, data);
 }
 
 int main()

@@ -305,17 +305,31 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 	for (int i = 0; i < numbers.length; i++)
 	{
 		int z = prevMaxSum;
-		for (; z >= bitsCount<uint64_t>(); z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>()))
+		if (z >= bitsCount<uint64_t>() * 2)
 		{
-			bitIndices indicesFromSum(z);
-			bitIndices indicesFromNewSum(z + numbers[i]);
+			z -= bitsCount<uint64_t>();
 
-			uint64_t* sumULongPtr = (uint64_t*)(newSums->begin() + indicesFromSum.byteIndex - sizeof(uint64_t) + 1);
-			uint64_t* newSumULongPtr = (uint64_t*)(newSums->begin() + indicesFromNewSum.byteIndex - sizeof(uint64_t) + 1);
+			bitIndices nextIndices(z);
+			uint64_t nextSet = *((uint64_t*)(newSums->begin() + nextIndices.byteIndex + 1));
+			do
+			{
+				int sumBitIndex = nextIndices.bitIndex;
+				nextIndices = bitIndices(z - (bitsCount<uint64_t>() - bitsCount<uint8_t>()));
+				uint64_t next = *((uint64_t*)(newSums->begin() + nextIndices.byteIndex + 1));
 
-			uint64_t fromSum = ((*sumULongPtr) >> indicesFromSum.bitIndex) << indicesFromNewSum.bitIndex;
+				bitIndices indicesFromNewSum(z + numbers[i]);
 
-			*newSumULongPtr |= fromSum;
+				uint64_t* newSumULongPtr = (uint64_t*)(newSums->begin() + indicesFromNewSum.byteIndex + 1);
+
+				uint64_t fromSum = ((nextSet) >> sumBitIndex) << indicesFromNewSum.bitIndex;
+
+				*newSumULongPtr |= fromSum;
+
+				nextSet = next;
+				z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>());
+			} while (z >= 64);
+
+			z += bitsCount<uint64_t>();
 		}
 
 		for (; z >= 0; z--)

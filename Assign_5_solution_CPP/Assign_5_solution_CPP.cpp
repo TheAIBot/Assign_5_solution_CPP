@@ -165,18 +165,66 @@ public:
 	}
 };
 
+struct PreSumsData
+{
+public:
+	bitArraySlim* bitArray;
+	int uniques;
+
+	PreSumsData(bitArraySlim* bits, int uniqs)
+	{
+		bitArray = bits;
+		uniques = uniqs;
+	}
+
+	PreSumsData()
+	{
+		bitArray = nullptr;
+		uniques = std::numeric_limits<int>::max();
+	}
+
+	SumsData ToSumsData(int number)
+	{
+		std::vector<int>* newSums = new std::vector<int>();
+		std::vector<int>* uniques = new std::vector<int>();
+
+		for (int i = 0; i < bitArray->size(); i++)
+		{
+			if ((*bitArray)[i] == 1)
+			{
+				int newSum = i + number;
+				if (newSum >= bitArray->size())
+				{
+					uniques->push_back(newSum);
+				}
+				else if ((*bitArray)[newSum] == 0)
+				{
+					uniques->push_back(newSum);
+				}
+				newSums->push_back(newSum);
+			}
+		}
+
+		return SumsData(newSums, uniques);
+	}
+};
+
 class BestSumsData
 {
 public:
-	SumsData Data;
+	PreSumsData Data;
 	int Number;
 
-	BestSumsData() : Data(SumsData(nullptr, nullptr, std::numeric_limits<int>::min())), Number(-1)
+	BestSumsData()
 	{
+		Data = PreSumsData();
+		Number = -1;
 	}
 
-	BestSumsData(int number, SumsData data) : Data(data), Number(number)
+	BestSumsData(int number, PreSumsData data)
 	{
+		Data = data;
+		Number = number;
 	}
 };
 
@@ -278,31 +326,6 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 	return newSums;
 }
 
-SumsData FinishCreateSumsData(int number, bitArraySlim& currSums)
-{
-	std::vector<int>* newSums = new std::vector<int>();
-	std::vector<int>* uniques = new std::vector<int>();
-
-	for (int i = 0; i < currSums.size(); i++)
-	{
-		if (currSums[i] == 1)
-		{
-			int newSum = i + number;
-			if (newSum >= currSums.size())
-			{
-				uniques->push_back(newSum);
-			}
-			else if (currSums[newSum] == 0)
-			{
-				uniques->push_back(newSum);
-			}
-			newSums->push_back(newSum);
-		}
-	}
-
-	return SumsData(newSums, uniques);
-}
-
 void CreateAllSums(int number, bitArraySlim& currSums, PartialSumsData& data)
 {
 	span<int> dwa(1);
@@ -313,7 +336,42 @@ void CreateAllSums(int number, bitArraySlim& currSums, PartialSumsData& data)
 	data.sumsCount = BoolArrayTrueCount(*data.sums);
 }
 
-void CreateAllSumsDatas(span<int> numbers, bitArraySlim& currSums, PartialSumsData& data)
+PreSumsData FinishCreateSumsData(int number, bitArraySlim& currSums, PartialSumsData& data)
+{
+	if (data.sumsCount != -1)
+	{
+		int currSumsCount = BoolArrayTrueCount(currSums);
+		int uniques = data.sumsCount - currSumsCount;
+		return PreSumsData(&currSums, uniques);
+	}
+
+	if (data.sumsCount == -1)
+	{
+		CreateAllSums(number, currSums, data);
+	}
+
+	int uniques = 0;
+
+	for (int i = 0; i < currSums.size(); i++)
+	{
+		if (currSums[i] == 1)
+		{
+			int newSum = i + number;
+			if (newSum >= currSums.size())
+			{
+				uniques++;
+			}
+			else if (currSums[newSum] == 0)
+			{
+				uniques++;
+			}
+		}
+	}
+
+	return PreSumsData(&currSums, uniques);
+}
+
+bool CreateAllSumsDatas(span<int> numbers, bitArraySlim& currSums, PartialSumsData& data)
 {
 	if (numbers.length > 1)
 	{
@@ -323,21 +381,25 @@ void CreateAllSumsDatas(span<int> numbers, bitArraySlim& currSums, PartialSumsDa
 
 		if (data.created > data.maxCreated)
 		{
-			return;
+			return false;
 		}
 
 		bitArraySlim* secondPartSums = CreatePartialSums(secondPart, currSums);
-		CreateAllSumsDatas(firstPart, *secondPartSums, data);
-		delete secondPartSums;
+		if (!CreateAllSumsDatas(firstPart, *secondPartSums, data))
+		{
+			delete secondPartSums;
+		}
 
 		if (data.created > data.maxCreated)
 		{
-			return;
+			return false;
 		}
 
 		bitArraySlim* firstPartSums = CreatePartialSums(firstPart, currSums);
-		CreateAllSumsDatas(secondPart, *firstPartSums, data);
-		delete firstPartSums;
+		if (!CreateAllSumsDatas(secondPart, *firstPartSums, data))
+		{
+			delete firstPartSums;
+		}
 	}
 	else
 	{
@@ -346,34 +408,25 @@ void CreateAllSumsDatas(span<int> numbers, bitArraySlim& currSums, PartialSumsDa
 		int actualSumCount = BoolArrayTrueCount(currSums);
 		if (data.sumsCount - actualSumCount > data.minuniques)
 		{
-			return;
+			return false;
 		}
 
 		int number = numbers[0];
 		if (data.foundData->find(number) == data.foundData->end())
 		{
-			BestSumsData newData(number, FinishCreateSumsData(number, currSums));
+			BestSumsData newData(number, FinishCreateSumsData(number, currSums, data));
+			data.minuniques = std::min(data.minuniques, (int)data.datas.Data.uniques);
 
-			if (newData.Data.Replications > data.datas.Data.Replications ||
-				(newData.Data.Replications == data.datas.Data.Replications &&
+			if (newData.Data.uniques < data.datas.Data.uniques ||
+				(newData.Data.uniques == data.datas.Data.uniques &&
 					newData.Number < data.datas.Number))
 			{
-				if (data.datas.Data.Uniques != nullptr)
-				{
-					delete data.datas.Data.Uniques;
-					delete data.datas.Data.NewSums;
-				}
 				data.datas = newData;
+				return true;
 			}
-
-			if (data.sumsCount == -1)
-			{
-				CreateAllSums(number, currSums, data);
-			}
-
-			data.minuniques = std::min(data.minuniques, (int)data.datas.Data.Uniques->size());
 		}
 	}
+	return false;
 }
 
 int GetFirstReplicateIndex(span<int> numbers)
@@ -407,7 +460,7 @@ int GetFirstReplicateIndex(span<int> numbers)
 
 Result CreateCollisionAvoidanceArray(bitArraySlim& sums, BestSumsData bestData)
 {
-	SumsData sumData = bestData.Data;
+	SumsData sumData = bestData.Data.ToSumsData(bestData.Number);
 
 	for (auto q = sumData.Uniques->begin(); q != sumData.Uniques->end(); q++)
 	{

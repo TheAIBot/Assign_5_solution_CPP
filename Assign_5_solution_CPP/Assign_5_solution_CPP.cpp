@@ -216,6 +216,12 @@ int BoolArrayTrueCount(bitArraySlim& array)
 	return trueCount;
 }
 
+template<typename T>
+int bitsCount()
+{
+	return sizeof(T) * 8;
+}
+
 bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 {
 	int maxSum = currSums.size();
@@ -231,19 +237,17 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 	for (int i = 0; i < numbers.length; i++)
 	{
 		int z = prevMaxSum;
-		for (; z >= 64; z -= (64 - 8))
+		for (; z >= bitsCount<uint64_t>(); z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>()))
 		{
 			bitIndices indicesFromSum(z);
 			bitIndices indicesFromNewSum(z + numbers[i]);
 
-			uint64_t* sumULongPtr = (uint64_t*)(newSums->begin() + indicesFromSum.byteIndex - 8 + 1);
-			uint64_t* newSumULongPtr = (uint64_t*)(newSums->begin() + indicesFromNewSum.byteIndex - 8 + 1);
+			uint64_t* sumULongPtr = (uint64_t*)(newSums->begin() + indicesFromSum.byteIndex - sizeof(uint64_t) + 1);
+			uint64_t* newSumULongPtr = (uint64_t*)(newSums->begin() + indicesFromNewSum.byteIndex - sizeof(uint64_t) + 1);
 
 			uint64_t fromSum = ((*sumULongPtr) >> indicesFromSum.bitIndex) << indicesFromNewSum.bitIndex;
 
 			*newSumULongPtr |= fromSum;
-
-			//((uint64_t*)(newSums->begin() + indicesFromNewSum.byteIndex)) = fromSum;
 
 		}
 

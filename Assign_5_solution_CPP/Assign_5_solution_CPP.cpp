@@ -316,7 +316,6 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 			uint64_t fromSum = ((*sumULongPtr) >> indicesFromSum.bitIndex) << indicesFromNewSum.bitIndex;
 
 			*newSumULongPtr |= fromSum;
-
 		}
 
 		for (; z >= 0; z--)
@@ -424,6 +423,10 @@ bool CreateAllSumsDatas(span<int> numbers, bitArraySlim& currSums, PartialSumsDa
 				(newData.Data.uniques == data.datas.Data.uniques &&
 					newData.Number < data.datas.Number))
 			{
+				if (data.datas.Data.bitArray != nullptr)
+				{
+					delete data.datas.Data.bitArray;
+				}
 				data.datas = newData;
 				return true;
 			}

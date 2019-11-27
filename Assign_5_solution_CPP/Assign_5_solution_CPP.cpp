@@ -1,6 +1,7 @@
 // Assign_5_solution_CPP.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
+#include <nmmintrin.h>
 #include <iostream>
 #include <vector>
 #include <unordered_set>
@@ -205,21 +206,37 @@ public:
 	}
 };
 
+template<typename T>
+int bitsCount()
+{
+	return sizeof(T) * 8;
+}
+
 int BoolArrayTrueCount(bitArraySlim& array)
 {
 	int trueCount = 0;
-	for (int i = 0; i < array.size(); i++)
+	int i = 0;
+
+	uint64_t* u64intArray = (uint64_t*)(array.begin());
+	for (; i < array.size() - bitsCount<uint64_t>(); i += bitsCount<uint64_t>())
+	{
+		//trueCount += __builtin_popcountll(u64intArray[i / bitsCount<uint64_t>()]);
+		trueCount += _mm_popcnt_u64(u64intArray[i / bitsCount<uint64_t>()]);
+	}
+
+	uint32_t* u32intArray = (uint32_t*)(array.begin());
+	for (; i < array.size() - bitsCount<uint32_t>(); i += bitsCount<uint32_t>())
+	{
+		//trueCount += __builtin_popcount(u32intArray[i / bitsCount<uint32_t>()]);
+		trueCount += _mm_popcnt_u64(u32intArray[i / bitsCount<uint32_t>()]);
+	}
+
+	for (; i < array.size(); i++)
 	{
 		trueCount += array[i];
 	}
 
 	return trueCount;
-}
-
-template<typename T>
-int bitsCount()
-{
-	return sizeof(T) * 8;
 }
 
 bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)

@@ -322,23 +322,23 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 			bitIndices currSumIndices(z);
 			bitIndices newSumIndices(z + numbers[i]);
 
-			uint64_t nextSet = *((uint64_t*)(newSums->begin() + currSumIndices.byteIndex + 1));
+			uint64_t* currSumPtr = ((uint64_t*)(newSums->begin() + currSumIndices.byteIndex + 1));
+			uint64_t* newSumPtr = ((uint64_t*)(newSums->begin() + newSumIndices.byteIndex + 1));
+
+			uint64_t nextSet = *currSumPtr;
 			do
 			{
-				uint64_t* newSumULongPtr = (uint64_t*)(newSums->begin() + newSumIndices.byteIndex + 1);
-				newSumIndices.byteIndex -= (sizeof(uint64_t) - sizeof(uint8_t));
-				currSumIndices.byteIndex -= (sizeof(uint64_t) - sizeof(uint8_t));
-
-				uint64_t next = *((uint64_t*)(newSums->begin() + currSumIndices.byteIndex + 1));
 				uint64_t fromSum = ((nextSet) >> currSumIndices.bitIndex) << newSumIndices.bitIndex;
-				nextSet = next;
+				currSumPtr = (uint64_t*)(((uint8_t*)currSumPtr) - (sizeof(uint64_t) - sizeof(uint8_t)));
+				nextSet = *currSumPtr;
 
-				*newSumULongPtr |= fromSum;
+				*newSumPtr |= fromSum;
+				newSumPtr = (uint64_t*)(((uint8_t*)newSumPtr) - (sizeof(uint64_t) - sizeof(uint8_t)));
 
 				z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>());
 			} while (z >= 64);
 
-			uint64_t* newSumULongPtr = (uint64_t*)(newSums->begin() + newSumIndices.byteIndex + 1);
+			uint64_t* newSumULongPtr = newSumPtr;
 			uint64_t fromSum = ((nextSet) >> currSumIndices.bitIndex) << newSumIndices.bitIndex;
 			*newSumULongPtr |= fromSum;
 

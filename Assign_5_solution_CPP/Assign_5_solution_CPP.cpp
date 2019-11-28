@@ -66,6 +66,16 @@ public:
 	}
 };
 
+int getByteIndex(int index)
+{
+	return index >> 3;
+}
+
+int getBitIndex(int index)
+{
+	return index & 0b0000'0111;
+}
+
 struct bitIndices
 {
 public:
@@ -74,8 +84,8 @@ public:
 
 	bitIndices(int index)
 	{
-		byteIndex = index >> 3;
-		bitIndex = index & 0b0000'0111;
+		byteIndex = getByteIndex(index);
+		bitIndex = getBitIndex(index);
 	}
 };
 
@@ -309,26 +319,30 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 		{
 			z -= bitsCount<uint64_t>();
 
-			bitIndices nextIndices(z);
-			uint64_t nextSet = *((uint64_t*)(newSums->begin() + nextIndices.byteIndex + 1));
+			bitIndices currSumIndices(z);
+			bitIndices newSumIndices(z + numbers[i]);
+
+			uint64_t nextSet = *((uint64_t*)(newSums->begin() + currSumIndices.byteIndex + 1));
 			do
 			{
-				int sumBitIndex = nextIndices.bitIndex;
-				nextIndices = bitIndices(z - (bitsCount<uint64_t>() - bitsCount<uint8_t>()));
-				uint64_t next = *((uint64_t*)(newSums->begin() + nextIndices.byteIndex + 1));
+				uint64_t* newSumULongPtr = (uint64_t*)(newSums->begin() + newSumIndices.byteIndex + 1);
+				newSumIndices.byteIndex -= (sizeof(uint64_t) - sizeof(uint8_t));
+				currSumIndices.byteIndex -= (sizeof(uint64_t) - sizeof(uint8_t));
 
-				bitIndices indicesFromNewSum(z + numbers[i]);
-
-				uint64_t* newSumULongPtr = (uint64_t*)(newSums->begin() + indicesFromNewSum.byteIndex + 1);
-
-				uint64_t fromSum = ((nextSet) >> sumBitIndex) << indicesFromNewSum.bitIndex;
+				uint64_t next = *((uint64_t*)(newSums->begin() + currSumIndices.byteIndex + 1));
+				uint64_t fromSum = ((nextSet) >> currSumIndices.bitIndex) << newSumIndices.bitIndex;
+				nextSet = next;
 
 				*newSumULongPtr |= fromSum;
 
-				nextSet = next;
 				z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>());
 			} while (z >= 64);
 
+			uint64_t* newSumULongPtr = (uint64_t*)(newSums->begin() + newSumIndices.byteIndex + 1);
+			uint64_t fromSum = ((nextSet) >> currSumIndices.bitIndex) << newSumIndices.bitIndex;
+			*newSumULongPtr |= fromSum;
+
+			z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>());
 			z += bitsCount<uint64_t>();
 		}
 

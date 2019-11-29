@@ -300,7 +300,7 @@ int BoolArrayTrueCount(bitArraySlim& array)
 	return trueCount;
 }
 
-inline int createSumsShiftLeft(int z, __m128i* currSumPtr, __m128i* newSumPtr, int leftShift)
+inline int createSums128ShiftLeft(int z, __m128i* currSumPtr, __m128i* newSumPtr, int leftShift)
 {
 	__m128i nextSetLoaded = _mm_lddqu_si128(currSumPtr);
 	__m128i nextSetShifted1ByteLeft = _mm_slli_si128(nextSetLoaded, 1);
@@ -324,7 +324,7 @@ inline int createSumsShiftLeft(int z, __m128i* currSumPtr, __m128i* newSumPtr, i
 	return z;
 }
 
-inline int createSumsNoShift(int z, __m128i* currSumPtr, __m128i* newSumPtr)
+inline int createSums128NoShift(int z, __m128i* currSumPtr, __m128i* newSumPtr)
 {
 	__m128i nextSet = _mm_lddqu_si128(currSumPtr);
 	do
@@ -344,7 +344,7 @@ inline int createSumsNoShift(int z, __m128i* currSumPtr, __m128i* newSumPtr)
 	return z;
 }
 
-inline int createSumsShiftRight(int z, __m128i* currSumPtr, __m128i* newSumPtr, int rightShift)
+inline int createSums128ShiftRight(int z, __m128i* currSumPtr, __m128i* newSumPtr, int rightShift)
 {
 	__m128i nextSetLoaded = _mm_lddqu_si128(currSumPtr);
 	__m128i nextSetShifted1ByteLeft = _mm_srli_si128(nextSetLoaded, 1);
@@ -465,10 +465,10 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 			case -3:
 			case -2:
 			case -1:
-				z = createSumsShiftLeft(z, currSumPtr, newSumPtr, newSumIndices.bitIndex - currSumIndices.bitIndex);
+				z = createSums128ShiftLeft(z, currSumPtr, newSumPtr, newSumIndices.bitIndex - currSumIndices.bitIndex);
 				break;
 			case  0:
-				z = createSumsNoShift(z, currSumPtr, newSumPtr);
+				z = createSums128NoShift(z, currSumPtr, newSumPtr);
 				break;
 			case  1:
 			case  2:
@@ -477,7 +477,7 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 			case  5:
 			case  6:
 			case  7:
-				z = createSumsShiftRight(z, currSumPtr, newSumPtr, currSumIndices.bitIndex - newSumIndices.bitIndex);
+				z = createSums128ShiftRight(z, currSumPtr, newSumPtr, currSumIndices.bitIndex - newSumIndices.bitIndex);
 				break;
 			default:
 				break;

@@ -281,15 +281,15 @@ int BoolArrayTrueCount(bitArraySlim& array)
 	uint64_t* u64intArray = (uint64_t*)(array.begin());
 	for (; i < array.size() - bitsCount<uint64_t>(); i += bitsCount<uint64_t>())
 	{
-		//trueCount += __builtin_popcountll(u64intArray[i / bitsCount<uint64_t>()]);
 		trueCount += _mm_popcnt_u64(u64intArray[i / bitsCount<uint64_t>()]);
+		//trueCount += __builtin_popcountll(u64intArray[i / bitsCount<uint64_t>()]);
 	}
 
 	uint32_t* u32intArray = (uint32_t*)(array.begin());
 	for (; i < array.size() - bitsCount<uint32_t>(); i += bitsCount<uint32_t>())
 	{
-		//trueCount += __builtin_popcount(u32intArray[i / bitsCount<uint32_t>()]);
 		trueCount += _mm_popcnt_u64(u32intArray[i / bitsCount<uint32_t>()]);
+		//trueCount += __builtin_popcount(u32intArray[i / bitsCount<uint32_t>()]);
 	}
 
 	for (; i < array.size(); i++)
@@ -443,48 +443,10 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 	for (int i = 0; i < numbers.length; i++)
 	{
 		int z = prevMaxSum;
-		//if (z >= bitsCount<uint64_t>() * 2)
-		//{
-		//	z -= bitsCount<uint64_t>();
-
-		//	bitIndices currSumIndices(z);
-		//	bitIndices newSumIndices(z + numbers[i]);
-
-		//	uint64_t* currSumPtr = ((uint64_t*)(newSums->begin() + currSumIndices.byteIndex + 1));
-		//	uint64_t* newSumPtr = ((uint64_t*)(newSums->begin() + newSumIndices.byteIndex + 1));
-
-		//	switch (currSumIndices.bitIndex - newSumIndices.bitIndex)
-		//	{
-		//	case -7:
-		//	case -6:
-		//	case -5:
-		//	case -4:
-		//	case -3:
-		//	case -2:
-		//	case -1:
-		//		z = createSumsNotVectorizedShiftLeft(z, currSumPtr, newSumPtr, newSumIndices.bitIndex - currSumIndices.bitIndex);
-		//		break;
-		//	case  0:
-		//		z = createSumsNotVectorizedNoShift(z, currSumPtr, newSumPtr);
-		//		break;
-		//	case  1:
-		//	case  2:
-		//	case  3:
-		//	case  4:
-		//	case  5:
-		//	case  6:
-		//	case  7:
-		//		z = createSumsNotVectorizedShiftRight(z, currSumPtr, newSumPtr, currSumIndices.bitIndex - newSumIndices.bitIndex);
-		//		break;
-		//	default:
-		//		//throw std::exception("fojewv");
-		//		break;
-		//	}
-
-		//	z += bitsCount<uint64_t>();
-		//}
-
-
+//#if defined(__AVX2__)
+	
+//#elif defined(__AVX__)
+#if defined(__AVX__)
 		if (z >= bitsCount<__m128i>() * 2)
 		{
 			z -= bitsCount<__m128i>();
@@ -518,12 +480,52 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 				z = createSumsShiftRight(z, currSumPtr, newSumPtr, currSumIndices.bitIndex - newSumIndices.bitIndex);
 				break;
 			default:
-				//z = createSumsNotVectorized(z, (uint64_t*)currSumPtr, (uint64_t*)newSumPtr, currSumIndices.bitIndex, newSumIndices.bitIndex);
-				//throw std::exception("fojewv");
 				break;
 			}
 			z += bitsCount<__m128i>();
 		}
+#else
+
+		if (z >= bitsCount<uint64_t>() * 2)
+		{
+			z -= bitsCount<uint64_t>();
+
+			bitIndices currSumIndices(z);
+			bitIndices newSumIndices(z + numbers[i]);
+
+			uint64_t* currSumPtr = ((uint64_t*)(newSums->begin() + currSumIndices.byteIndex + 1));
+			uint64_t* newSumPtr = ((uint64_t*)(newSums->begin() + newSumIndices.byteIndex + 1));
+
+			switch (currSumIndices.bitIndex - newSumIndices.bitIndex)
+			{
+			case -7:
+			case -6:
+			case -5:
+			case -4:
+			case -3:
+			case -2:
+			case -1:
+				z = createSumsNotVectorizedShiftLeft(z, currSumPtr, newSumPtr, newSumIndices.bitIndex - currSumIndices.bitIndex);
+				break;
+			case  0:
+				z = createSumsNotVectorizedNoShift(z, currSumPtr, newSumPtr);
+				break;
+			case  1:
+			case  2:
+			case  3:
+			case  4:
+			case  5:
+			case  6:
+			case  7:
+				z = createSumsNotVectorizedShiftRight(z, currSumPtr, newSumPtr, currSumIndices.bitIndex - newSumIndices.bitIndex);
+				break;
+			default:
+				break;
+			}
+
+			z += bitsCount<uint64_t>();
+		}
+#endif
 
 		for (; z >= 0; z--)
 		{

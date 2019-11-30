@@ -12,7 +12,6 @@
 #include <sstream>
 #include <cctype>
 #include <cstdint>
-#include <exception>
 
 template<typename T>
 struct span
@@ -481,7 +480,6 @@ int tryCreateSumsVectorized(int z, int number, bitArraySlim& newSums)
 			z = createSumsShiftRight(z, currSumPtr, newSumPtr, currSumIndices.bitIndex - newSumIndices.bitIndex);
 			break;
 		default:
-			throw std::exception("something wierd happended");
 			break;
 		}
 		z += bitsCount<T>();

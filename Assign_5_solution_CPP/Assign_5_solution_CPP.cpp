@@ -2,6 +2,7 @@
 //
 
 #include <nmmintrin.h>
+#include <immintrin.h>
 #include <iostream>
 #include <vector>
 #include <unordered_set>
@@ -11,6 +12,7 @@
 #include <sstream>
 #include <cctype>
 #include <cstdint>
+#include <exception>
 
 template<typename T>
 struct span
@@ -300,131 +302,191 @@ int BoolArrayTrueCount(bitArraySlim& array)
 	return trueCount;
 }
 
-inline int createSums128ShiftLeft(int z, __m128i* currSumPtr, __m128i* newSumPtr, int leftShift)
+template<typename = __m256i>
+inline __m256i vectorLoadShiftLeft(__m256i* toShiftPtr, int leftShift)
 {
-	__m128i nextSetLoaded = _mm_lddqu_si128(currSumPtr);
-	__m128i nextSetShifted1ByteLeft = _mm_slli_si128(nextSetLoaded, 1);
-	__m128i nextSet = _mm_or_si128(_mm_slli_epi16(nextSetLoaded, leftShift), _mm_srli_epi16(nextSetShifted1ByteLeft, 8 - leftShift));
+	__m256i toShift = _mm256_lddqu_si256(toShiftPtr);
+	__m256i moved1ByteLeft = _mm256_lddqu_si256((__m256i*)(((uint8_t*)toShiftPtr) - 1));
+	return  _mm256_or_si256(_mm256_slli_epi16(toShift, leftShift), _mm256_srli_epi16(moved1ByteLeft, 8 - leftShift));
+}
+
+template<typename = __m256i>
+inline __m256i vectorLoadShiftRight(__m256i* toShiftPtr, int rightShift)
+{
+	__m256i toShift = _mm256_lddqu_si256(toShiftPtr);
+	__m256i moved1ByteRight = _mm256_lddqu_si256((__m256i*)(((uint8_t*)toShiftPtr) + 1));
+	return  _mm256_or_si256(_mm256_srli_epi16(toShift, rightShift), _mm256_slli_epi16(moved1ByteRight, 8 - rightShift));
+}
+
+template<typename = __m128i>
+inline __m128i vectorLoadShiftLeft(__m128i* toShiftPtr, int leftShift)
+{
+	__m128i toShift = _mm_lddqu_si128(toShiftPtr);
+	__m128i moved1ByteLeft = _mm_slli_si128(toShift, 1);
+	return  _mm_or_si128(_mm_slli_epi16(toShift, leftShift), _mm_srli_epi16(moved1ByteLeft, 8 - leftShift));
+}
+
+template<typename = __m128i>
+inline __m128i vectorLoadShiftRight(__m128i* toShiftPtr, int rightShift)
+{
+	__m128i toShift = _mm_lddqu_si128(toShiftPtr);
+	__m128i moved1ByteLeft = _mm_srli_si128(toShift, 1);
+	return  _mm_or_si128(_mm_srli_epi16(toShift, rightShift), _mm_slli_epi16(moved1ByteLeft, 8 - rightShift));
+}
+
+template<typename = uint64_t>
+inline uint64_t vectorLoadShiftLeft(uint64_t* toShiftPtr, int leftShift)
+{
+	return (*toShiftPtr) << leftShift;
+}
+
+template<typename = uint64_t>
+inline uint64_t vectorLoadShiftRight(uint64_t* toShiftPtr, int rightShift)
+{
+	return (*toShiftPtr) >> rightShift;
+}
+
+template<typename = __m256i>
+inline __m256i vectorLoad(__m256i* toLoad)
+{
+	return _mm256_lddqu_si256(toLoad);
+}
+
+template<typename = __m128i>
+inline __m128i vectorLoad(__m128i* toLoad)
+{
+	return _mm_lddqu_si128(toLoad);
+}
+
+template<typename = uint64_t>
+inline uint64_t vectorLoad(uint64_t* toLoad)
+{
+	return *toLoad;
+}
+
+template<typename = __m256i>
+inline void vectorOrAssignment(__m256i* storePtr, __m256i toOrWith)
+{
+	_mm256_storeu_si256(storePtr, _mm256_or_si256(_mm256_lddqu_si256(storePtr), toOrWith));
+}
+
+template<typename = __m128i>
+inline void vectorOrAssignment(__m128i* storePtr, __m128i toOrWith)
+{
+	_mm_storeu_si128(storePtr, _mm_or_si128(_mm_lddqu_si128(storePtr), toOrWith));
+}
+
+template<typename = uint64_t>
+inline void vectorOrAssignment(uint64_t* storePtr, uint64_t toOrWith)
+{
+	*storePtr |= toOrWith;
+}
+
+template<typename T>
+inline int createSumsShiftLeft(int z, T* currSumPtr, T* newSumPtr, int leftShift)
+{
+	T nextSet = vectorLoadShiftLeft(currSumPtr, leftShift);
 	do
 	{
-		__m128i fromSum = nextSet;
-		currSumPtr = (__m128i*)(((uint8_t*)currSumPtr) - (sizeof(__m128i) - sizeof(uint8_t)));
-		nextSetLoaded = _mm_lddqu_si128(currSumPtr);
-		nextSetShifted1ByteLeft = _mm_slli_si128(nextSetLoaded, 1);
-		nextSet = _mm_or_si128(_mm_slli_epi16(nextSetLoaded, leftShift), _mm_srli_epi16(nextSetShifted1ByteLeft, 8 - leftShift));
+		T fromSum = nextSet;
+		currSumPtr = (T*)(((uint8_t*)currSumPtr) - (sizeof(T) - sizeof(uint8_t)));
+		nextSet = vectorLoadShiftLeft(currSumPtr, leftShift);
 
-		_mm_storeu_si128(newSumPtr, _mm_or_si128(_mm_lddqu_si128(newSumPtr), fromSum));
-		newSumPtr = (__m128i*)(((uint8_t*)newSumPtr) - (sizeof(__m128i) - sizeof(uint8_t)));
+		vectorOrAssignment(newSumPtr, fromSum);
+		newSumPtr = (T*)(((uint8_t*)newSumPtr) - (sizeof(T) - sizeof(uint8_t)));
 
-		z -= (bitsCount<__m128i>() - bitsCount<uint8_t>());
-	} while (z >= bitsCount<__m128i>());
-	_mm_storeu_si128(newSumPtr, _mm_or_si128(_mm_lddqu_si128(newSumPtr), nextSet));
+		z -= (bitsCount<T>() - bitsCount<uint8_t>());
+	} while (z >= bitsCount<T>());
+	vectorOrAssignment(newSumPtr, nextSet);
 
-	z -= (bitsCount<__m128i>() - bitsCount<uint8_t>());
+	z -= (bitsCount<T>() - bitsCount<uint8_t>());
 	return z;
 }
 
-inline int createSums128NoShift(int z, __m128i* currSumPtr, __m128i* newSumPtr)
+template<typename T>
+inline int createSumsNoShift(int z, T* currSumPtr, T* newSumPtr)
 {
-	__m128i nextSet = _mm_lddqu_si128(currSumPtr);
+	T nextSet = vectorLoad(currSumPtr);
 	do
 	{
-		__m128i fromSum = nextSet;
-		currSumPtr = (__m128i*)(((uint8_t*)currSumPtr) - (sizeof(__m128i) - sizeof(uint8_t)));
-		nextSet = _mm_lddqu_si128(currSumPtr);
+		T fromSum = nextSet;
+		currSumPtr = (T*)(((uint8_t*)currSumPtr) - (sizeof(T) - sizeof(uint8_t)));
+		nextSet = vectorLoad(currSumPtr);
 
-		_mm_storeu_si128(newSumPtr, _mm_or_si128(_mm_lddqu_si128(newSumPtr), fromSum));
-		newSumPtr = (__m128i*)(((uint8_t*)newSumPtr) - (sizeof(__m128i) - sizeof(uint8_t)));
+		vectorOrAssignment(newSumPtr, fromSum);
+		newSumPtr = (T*)(((uint8_t*)newSumPtr) - (sizeof(T) - sizeof(uint8_t)));
 
-		z -= (bitsCount<__m128i>() - bitsCount<uint8_t>());
-	} while (z >= bitsCount<__m128i>());
-	_mm_storeu_si128(newSumPtr, _mm_or_si128(_mm_lddqu_si128(newSumPtr), nextSet));
+		z -= (bitsCount<T>() - bitsCount<uint8_t>());
+	} while (z >= bitsCount<T>());
+	vectorOrAssignment(newSumPtr, nextSet);
 
-	z -= (bitsCount<__m128i>() - bitsCount<uint8_t>());
+	z -= (bitsCount<T>() - bitsCount<uint8_t>());
 	return z;
 }
 
-inline int createSums128ShiftRight(int z, __m128i* currSumPtr, __m128i* newSumPtr, int rightShift)
+template<typename T>
+inline int createSumsShiftRight(int z, T* currSumPtr, T* newSumPtr, int rightShift)
 {
-	__m128i nextSetLoaded = _mm_lddqu_si128(currSumPtr);
-	__m128i nextSetShifted1ByteLeft = _mm_srli_si128(nextSetLoaded, 1);
-	__m128i nextSet = _mm_or_si128(_mm_srli_epi16(nextSetLoaded, rightShift), _mm_slli_epi16(nextSetShifted1ByteLeft, 8 - rightShift));
+	T nextSet = vectorLoadShiftRight(currSumPtr, rightShift);
 	do
 	{
-		__m128i fromSum = nextSet;
-		currSumPtr = (__m128i*)(((uint8_t*)currSumPtr) - (sizeof(__m128i) - sizeof(uint8_t)));
-		nextSetLoaded = _mm_lddqu_si128(currSumPtr);
-		nextSetShifted1ByteLeft = _mm_srli_si128(nextSetLoaded, 1);
-		nextSet = _mm_or_si128(_mm_srli_epi16(nextSetLoaded, rightShift), _mm_slli_epi16(nextSetShifted1ByteLeft, 8 - rightShift));
+		T fromSum = nextSet;
+		currSumPtr = (T*)(((uint8_t*)currSumPtr) - (sizeof(T) - sizeof(uint8_t)));
+		nextSet = vectorLoadShiftRight(currSumPtr, rightShift);
 
-		_mm_storeu_si128(newSumPtr, _mm_or_si128(_mm_lddqu_si128(newSumPtr), fromSum));
-		newSumPtr = (__m128i*)(((uint8_t*)newSumPtr) - (sizeof(__m128i) - sizeof(uint8_t)));
+		vectorOrAssignment(newSumPtr, fromSum);
+		newSumPtr = (T*)(((uint8_t*)newSumPtr) - (sizeof(T) - sizeof(uint8_t)));
 
-		z -= (bitsCount<__m128i>() - bitsCount<uint8_t>());
-	} while (z >= bitsCount<__m128i>());
-	_mm_storeu_si128(newSumPtr, _mm_or_si128(_mm_lddqu_si128(newSumPtr), nextSet));
+		z -= (bitsCount<T>() - bitsCount<uint8_t>());
+	} while (z >= bitsCount<T>());
+	vectorOrAssignment(newSumPtr, nextSet);
 
-	z -= (bitsCount<__m128i>() - bitsCount<uint8_t>());
+	z -= (bitsCount<T>() - bitsCount<uint8_t>());
 	return z;
 }
 
-inline int createSumsNotVectorizedShiftLeft(int z, uint64_t* currSumPtr, uint64_t* newSumPtr, int leftShift)
+template<typename T>
+int tryCreateSumsVectorized(int z, int number, bitArraySlim& newSums)
 {
-	uint64_t nextSet = (*currSumPtr) << leftShift;
-	do
+	if (z >= bitsCount<T>() * 2)
 	{
-		uint64_t fromSum = nextSet;
-		currSumPtr = (uint64_t*)(((uint8_t*)currSumPtr) - (sizeof(uint64_t) - sizeof(uint8_t)));
-		nextSet = (*currSumPtr) << leftShift;
+		z -= bitsCount<T>();
 
-		*newSumPtr |= fromSum;
-		newSumPtr = (uint64_t*)(((uint8_t*)newSumPtr) - (sizeof(uint64_t) - sizeof(uint8_t)));
+		bitIndices currSumIndices(z);
+		bitIndices newSumIndices(z + number);
 
-		z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>());
-	} while (z >= bitsCount<uint64_t>());
-	*newSumPtr |= nextSet;
+		T* currSumPtr = ((T*)(newSums.begin() + currSumIndices.byteIndex + 1));
+		T* newSumPtr = ((T*)(newSums.begin() + newSumIndices.byteIndex + 1));
+		switch (currSumIndices.bitIndex - newSumIndices.bitIndex)
+		{
+		case -7:
+		case -6:
+		case -5:
+		case -4:
+		case -3:
+		case -2:
+		case -1:
+			z = createSumsShiftLeft(z, currSumPtr, newSumPtr, newSumIndices.bitIndex - currSumIndices.bitIndex);
+			break;
+		case  0:
+			z = createSumsNoShift(z, currSumPtr, newSumPtr);
+			break;
+		case  1:
+		case  2:
+		case  3:
+		case  4:
+		case  5:
+		case  6:
+		case  7:
+			z = createSumsShiftRight(z, currSumPtr, newSumPtr, currSumIndices.bitIndex - newSumIndices.bitIndex);
+			break;
+		default:
+			throw std::exception("something wierd happended");
+			break;
+		}
+		z += bitsCount<T>();
+	}
 
-	z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>());
-	return z;
-}
-
-inline int createSumsNotVectorizedNoShift(int z, uint64_t* currSumPtr, uint64_t* newSumPtr)
-{
-	uint64_t nextSet = *currSumPtr;
-	do
-	{
-		uint64_t fromSum = nextSet;
-		currSumPtr = (uint64_t*)(((uint8_t*)currSumPtr) - (sizeof(uint64_t) - sizeof(uint8_t)));
-		nextSet = *currSumPtr;
-
-		*newSumPtr |= fromSum;
-		newSumPtr = (uint64_t*)(((uint8_t*)newSumPtr) - (sizeof(uint64_t) - sizeof(uint8_t)));
-
-		z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>());
-	} while (z >= bitsCount<uint64_t>());
-	*newSumPtr |= nextSet;
-
-	z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>());
-	return z;
-}
-
-inline int createSumsNotVectorizedShiftRight(int z, uint64_t* currSumPtr, uint64_t* newSumPtr, int rightShift)
-{
-	uint64_t nextSet = (*currSumPtr) >> rightShift;
-	do
-	{
-		uint64_t fromSum = nextSet;
-		currSumPtr = (uint64_t*)(((uint8_t*)currSumPtr) - (sizeof(uint64_t) - sizeof(uint8_t)));
-		nextSet = (*currSumPtr) >> rightShift;
-
-		*newSumPtr |= fromSum;
-		newSumPtr = (uint64_t*)(((uint8_t*)newSumPtr) - (sizeof(uint64_t) - sizeof(uint8_t)));
-
-		z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>());
-	} while (z >= bitsCount<uint64_t>());
-	*newSumPtr |= nextSet;
-
-	z -= (bitsCount<uint64_t>() - bitsCount<uint8_t>());
 	return z;
 }
 
@@ -443,89 +505,10 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 	for (int i = 0; i < numbers.length; i++)
 	{
 		int z = prevMaxSum;
-//#if defined(__AVX2__)
-	
-//#elif defined(__AVX__)
-#if defined(__AVX__)
-		if (z >= bitsCount<__m128i>() * 2)
-		{
-			z -= bitsCount<__m128i>();
 
-			bitIndices currSumIndices(z);
-			bitIndices newSumIndices(z + numbers[i]);
-
-			__m128i* currSumPtr = ((__m128i*)(newSums->begin() + currSumIndices.byteIndex + 1));
-			__m128i* newSumPtr = ((__m128i*)(newSums->begin() + newSumIndices.byteIndex + 1));
-			switch (currSumIndices.bitIndex - newSumIndices.bitIndex)
-			{
-			case -7:
-			case -6:
-			case -5:
-			case -4:
-			case -3:
-			case -2:
-			case -1:
-				z = createSums128ShiftLeft(z, currSumPtr, newSumPtr, newSumIndices.bitIndex - currSumIndices.bitIndex);
-				break;
-			case  0:
-				z = createSums128NoShift(z, currSumPtr, newSumPtr);
-				break;
-			case  1:
-			case  2:
-			case  3:
-			case  4:
-			case  5:
-			case  6:
-			case  7:
-				z = createSums128ShiftRight(z, currSumPtr, newSumPtr, currSumIndices.bitIndex - newSumIndices.bitIndex);
-				break;
-			default:
-				break;
-			}
-			z += bitsCount<__m128i>();
-		}
-#else
-
-		if (z >= bitsCount<uint64_t>() * 2)
-		{
-			z -= bitsCount<uint64_t>();
-
-			bitIndices currSumIndices(z);
-			bitIndices newSumIndices(z + numbers[i]);
-
-			uint64_t* currSumPtr = ((uint64_t*)(newSums->begin() + currSumIndices.byteIndex + 1));
-			uint64_t* newSumPtr = ((uint64_t*)(newSums->begin() + newSumIndices.byteIndex + 1));
-
-			switch (currSumIndices.bitIndex - newSumIndices.bitIndex)
-			{
-			case -7:
-			case -6:
-			case -5:
-			case -4:
-			case -3:
-			case -2:
-			case -1:
-				z = createSumsNotVectorizedShiftLeft(z, currSumPtr, newSumPtr, newSumIndices.bitIndex - currSumIndices.bitIndex);
-				break;
-			case  0:
-				z = createSumsNotVectorizedNoShift(z, currSumPtr, newSumPtr);
-				break;
-			case  1:
-			case  2:
-			case  3:
-			case  4:
-			case  5:
-			case  6:
-			case  7:
-				z = createSumsNotVectorizedShiftRight(z, currSumPtr, newSumPtr, currSumIndices.bitIndex - newSumIndices.bitIndex);
-				break;
-			default:
-				break;
-			}
-
-			z += bitsCount<uint64_t>();
-		}
-#endif
+		z = tryCreateSumsVectorized<__m256i>(z, numbers[i], *newSums);
+		//z = tryCreateSumsVectorized<__m128i>(z, numbers[i], *newSums);
+		//z = tryCreateSumsVectorized<uint64_t>(z, numbers[i], *newSums);
 
 		for (; z >= 0; z--)
 		{

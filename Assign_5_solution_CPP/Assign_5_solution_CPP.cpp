@@ -509,9 +509,9 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 	{
 		int z = prevMaxSum;
 
-		z = tryCreateSumsVectorized<__m256i>(z, numbers[i], *newSums);
-		//z = tryCreateSumsVectorized<__m128i>(z, numbers[i], *newSums);
-		//z = tryCreateSumsVectorized<uint64_t>(z, numbers[i], *newSums);
+		//z = tryCreateSumsVectorized<__m256i>(z, numbers[i], *newSums);
+		z = tryCreateSumsVectorized<__m128i>(z, numbers[i], *newSums);
+		z = tryCreateSumsVectorized<uint64_t>(z, numbers[i], *newSums);
 
 		for (; z >= 0; z--)
 		{
@@ -529,8 +529,6 @@ void CreateAllSums(int number, bitArraySlim& currSums, PartialSumsData& data)
 	dwa[0] = number;
 	data.sums = CreatePartialSums(dwa, currSums);
 	delete[] dwa.array;
-
-	data.sumsCount = BoolArrayTrueCount(*data.sums);
 }
 
 PreSumsData FinishCreateSumsData(int number, bitArraySlim& currSums, PartialSumsData& data)
@@ -545,10 +543,10 @@ PreSumsData FinishCreateSumsData(int number, bitArraySlim& currSums, PartialSums
 	if (data.sumsCount == -1)
 	{
 		CreateAllSums(number, currSums, data);
+		data.sumsCount = BoolArrayTrueCount(*data.sums);
 	}
 
 	int uniques = 0;
-
 	for (int i = 0; i < currSums.size(); i++)
 	{
 		if (currSums[i] == 1)
@@ -638,23 +636,31 @@ int GetFirstReplicateIndex(span<int> numbers)
 		maxSum += numbers[i];
 	}
 
-	span<char> newSums(maxSum);
-	newSums[0] = true;
+	bitArraySlim* newSums = new bitArraySlim(maxSum);
+	newSums->forceSet(0, 1);
 
 	int prevMaxSum = 0;
 	for (int i = 0; i < numbers.length; i++)
 	{
-		if (newSums[numbers[i]])
+		if ((*newSums)[numbers[i]])
 		{
+			delete newSums;
 			return i;
 		}
-		for (int z = prevMaxSum; z >= 0; z--)
+
+		int z = prevMaxSum;
+
+		//z = tryCreateSumsVectorized<__m256i>(z, numbers[i], *newSums);
+		z = tryCreateSumsVectorized<__m128i>(z, numbers[i], *newSums);
+		z = tryCreateSumsVectorized<uint64_t>(z, numbers[i], *newSums);
+
+		for (; z >= 0; z--)
 		{
-			newSums[z + numbers[i]] |= newSums[z];
+			newSums->set(z + numbers[i], (*newSums)[z]);
 		}
 		prevMaxSum += numbers[i];
 	}
-	delete[] newSums.array;
+	delete newSums;
 
 	return numbers.length;
 }

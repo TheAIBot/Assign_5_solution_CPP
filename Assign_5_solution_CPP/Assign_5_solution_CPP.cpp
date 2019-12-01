@@ -283,14 +283,12 @@ int BoolArrayTrueCount(bitArraySlim& array)
 	for (; i < array.size() - bitsCount<uint64_t>(); i += bitsCount<uint64_t>())
 	{
 		trueCount += _mm_popcnt_u64(u64intArray[i / bitsCount<uint64_t>()]);
-		//trueCount += __builtin_popcountll(u64intArray[i / bitsCount<uint64_t>()]);
 	}
 
 	uint32_t* u32intArray = (uint32_t*)(array.begin());
 	for (; i < array.size() - bitsCount<uint32_t>(); i += bitsCount<uint32_t>())
 	{
-		trueCount += _mm_popcnt_u64(u32intArray[i / bitsCount<uint32_t>()]);
-		//trueCount += __builtin_popcount(u32intArray[i / bitsCount<uint32_t>()]);
+		trueCount += _mm_popcnt_u32(u32intArray[i / bitsCount<uint32_t>()]);
 	}
 
 	for (; i < array.size(); i++)

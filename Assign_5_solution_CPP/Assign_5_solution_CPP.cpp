@@ -531,11 +531,10 @@ void CreateAllSums(int number, bitArraySlim& currSums, PartialSumsData& data)
 	delete[] dwa.array;
 }
 
-PreSumsData FinishCreateSumsData(int number, bitArraySlim& currSums, PartialSumsData& data)
+PreSumsData FinishCreateSumsData(int number, bitArraySlim& currSums, int currSumsCount, PartialSumsData& data)
 {
 	if (data.sumsCount != -1)
 	{
-		int currSumsCount = BoolArrayTrueCount(currSums);
 		int uniques = data.sumsCount - currSumsCount;
 		return PreSumsData(&currSums, uniques);
 	}
@@ -609,8 +608,8 @@ bool CreateAllSumsDatas(span<int> numbers, bitArraySlim& currSums, PartialSumsDa
 		int number = numbers[0];
 		if (data.foundData->find(number) == data.foundData->end())
 		{
-			BestSumsData newData(number, FinishCreateSumsData(number, currSums, data));
-			data.minuniques = std::min(data.minuniques, (int)data.datas.Data.uniques);
+			BestSumsData newData(number, FinishCreateSumsData(number, currSums, actualSumCount, data));
+			data.minuniques = std::min(data.minuniques, data.datas.Data.uniques);
 
 			if (newData.Data.uniques < data.datas.Data.uniques ||
 				(newData.Data.uniques == data.datas.Data.uniques &&

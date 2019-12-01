@@ -263,8 +263,15 @@ public:
 	int maxCreated;
 	bitArraySlim* sums;
 
-	PartialSumsData()
+	PartialSumsData(int maxC)
 	{
+		foundData = new std::unordered_set<int>();
+		datas = BestSumsData();
+		minuniques = std::numeric_limits<int>::max();
+		sumsCount = -1;
+		created = 0;
+		maxCreated = maxC;
+		sums = nullptr;
 	}
 };
 
@@ -704,12 +711,7 @@ Result Solve(span<int> numbers)
 	bitArraySlim* currSums = new bitArraySlim(1);
 	currSums->forceSet(0, 1);
 
-	PartialSumsData data;
-	data.foundData = new std::unordered_set<int>();
-	data.minuniques = std::numeric_limits<int>::max();
-	data.sumsCount = -1;
-	data.created = 0;
-	data.maxCreated = maxCreated;
+	PartialSumsData data(maxCreated);
 
 	CreateAllSumsDatas(numbers, *currSums, data);
 	delete currSums;

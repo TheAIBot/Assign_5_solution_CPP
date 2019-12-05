@@ -260,17 +260,15 @@ public:
 	int minuniques;
 	int sumsCount;
 	int created;
-	int maxCreated;
 	bitArraySlim* sums;
 
-	PartialSumsData(int maxC)
+	PartialSumsData()
 	{
 		foundData = new std::unordered_set<int>();
 		datas = BestSumsData();
 		minuniques = std::numeric_limits<int>::max();
 		sumsCount = -1;
 		created = 0;
-		maxCreated = maxC;
 		sums = nullptr;
 	}
 };
@@ -573,20 +571,10 @@ bool CreateAllSumsDatas(span<int> numbers, bitArraySlim& currSums, PartialSumsDa
 		span<int> firstPart = numbers.slice(0, midPoint);
 		span<int> secondPart = numbers.slice(midPoint);
 
-		if (data.created > data.maxCreated)
-		{
-			return false;
-		}
-
 		bitArraySlim* secondPartSums = CreatePartialSums(secondPart, currSums);
 		if (!CreateAllSumsDatas(firstPart, *secondPartSums, data))
 		{
 			delete secondPartSums;
-		}
-
-		if (data.created > data.maxCreated)
-		{
-			return false;
 		}
 
 		bitArraySlim* firstPartSums = CreatePartialSums(firstPart, currSums);
@@ -625,43 +613,6 @@ bool CreateAllSumsDatas(span<int> numbers, bitArraySlim& currSums, PartialSumsDa
 		}
 	}
 	return false;
-}
-
-int GetFirstReplicateIndex(span<int> numbers)
-{
-	int maxSum = 1;
-	for (int i = 0; i < numbers.length; i++)
-	{
-		maxSum += numbers[i];
-	}
-
-	bitArraySlim* newSums = new bitArraySlim(maxSum);
-	newSums->forceSet(0, 1);
-
-	int prevMaxSum = 0;
-	for (int i = 0; i < numbers.length; i++)
-	{
-		if ((*newSums)[numbers[i]])
-		{
-			delete newSums;
-			return i;
-		}
-
-		int z = prevMaxSum;
-
-		//z = tryCreateSumsVectorized<__m256i>(z, numbers[i], *newSums);
-		z = tryCreateSumsVectorized<__m128i>(z, numbers[i], *newSums);
-		z = tryCreateSumsVectorized<uint64_t>(z, numbers[i], *newSums);
-
-		for (; z >= 0; z--)
-		{
-			newSums->set(z + numbers[i], (*newSums)[z]);
-		}
-		prevMaxSum += numbers[i];
-	}
-	delete newSums;
-
-	return numbers.length;
 }
 
 Result CreateCollisionAvoidanceArray(bitArraySlim& sums, BestSumsData bestData, PartialSumsData& data)
@@ -710,13 +661,10 @@ Result Solve(span<int> numbers)
 {
 	std::sort(numbers.begin(), numbers.end());
 
-	int maxCreated = GetFirstReplicateIndex(numbers);
-	//std::cout << maxCreated << std::endl;
-
 	bitArraySlim* currSums = new bitArraySlim(1);
 	currSums->forceSet(0, 1);
 
-	PartialSumsData data(maxCreated);
+	PartialSumsData data;
 
 	CreateAllSumsDatas(numbers, *currSums, data);
 	delete currSums;

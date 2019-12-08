@@ -1,0 +1,18 @@
+-r
+D:\Dropbox\Dropbox\DTU_Software_Teknologi\Kandidat\Algo_2\Assignments\Programming\Assign_5_solution_CPP\Assign_5_solution_CPP\VTune Amplifier Results\Assign_5_solution_CPP\r003hs
+--itt-config=frame
+--collector=vtsspp
+--data-limit-mb=1000
+--disk-space-limit=0
+--mrte-type=java,dotnet
+--event-config=CPU_CLK_UNHALTED.THREAD:sa=3700000,CPU_CLK_UNHALTED.REF_TSC:sa=3700000,INST_RETIRED.ANY:sample:sa=3700000,CPU_CLK_UNHALTED.REF_XCLK:sa=100003,CPU_CLK_UNHALTED.ONE_THREAD_ACTIVE:sa=100003,UOPS_RETIRED.RETIRE_SLOTS:sample:sa=2000003,FP_COMP_OPS_EXE.SSE_PACKED_DOUBLE:sa=2000003,FP_COMP_OPS_EXE.SSE_PACKED_SINGLE:sa=2000003,SIMD_FP_256.PACKED_SINGLE:sa=2000003,SIMD_FP_256.PACKED_DOUBLE:sa=2000003,FP_COMP_OPS_EXE.SSE_SCALAR_SINGLE:sa=2000003,FP_COMP_OPS_EXE.SSE_SCALAR_DOUBLE:sa=2000003,FP_COMP_OPS_EXE.X87:sa=2000003,UOPS_EXECUTED.THREAD:sa=2000003
+--platform-type=92
+--event-based-counts
+--event-mux-trigger=CPU_CLK_UNHALTED.REF_TSC
+--sample-after-multiplier=5
+--uncore-sampling-interval=10
+--mrte-mode=auto
+--itt-config=task,event,counter
+--etw-config=clr,js
+--
+D:\Dropbox\Dropbox\DTU_Software_Teknologi\Kandidat\Algo_2\Assignments\Programming\Assign_5_solution_CPP\Assign_5_solution_CPP\x64\Release\Assign_5_solution_CPP.exe

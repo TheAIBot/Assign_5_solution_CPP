@@ -428,8 +428,10 @@ inline void vectorOrAssignment(uint64_t* storePtr, uint64_t toOrWith)
 template<typename T>
 inline int createSumsShiftLeft(int z, T* currSumPtr, T* newSumPtr, int leftShift)
 {
+	int loops = (z / (bitsCount<T>() - bitsCount<uint8_t>())) - 1;
+
 	T nextSet = vectorLoadShiftLeft(currSumPtr, leftShift);
-	do
+	for (int i = 0; i < loops; i++)
 	{
 		T fromSum = nextSet;
 		currSumPtr = (T*)(((uint8_t*)currSumPtr) - (sizeof(T) - sizeof(uint8_t)));
@@ -437,20 +439,20 @@ inline int createSumsShiftLeft(int z, T* currSumPtr, T* newSumPtr, int leftShift
 
 		vectorOrAssignment(newSumPtr, fromSum);
 		newSumPtr = (T*)(((uint8_t*)newSumPtr) - (sizeof(T) - sizeof(uint8_t)));
-
-		z -= (bitsCount<T>() - bitsCount<uint8_t>());
-	} while (z >= bitsCount<T>());
+	}
 	vectorOrAssignment(newSumPtr, nextSet);
 
-	z -= (bitsCount<T>() - bitsCount<uint8_t>());
+	z -= (loops + 1) * (bitsCount<T>() - bitsCount<uint8_t>());
 	return z;
 }
 
 template<typename T>
 inline int createSumsNoShift(int z, T* currSumPtr, T* newSumPtr)
 {
+	int loops = (z / (bitsCount<T>() - bitsCount<uint8_t>())) - 1;
+
 	T nextSet = vectorLoad(currSumPtr);
-	do
+	for (int i = 0; i < loops; i++)
 	{
 		T fromSum = nextSet;
 		currSumPtr = (T*)(((uint8_t*)currSumPtr) - (sizeof(T) - sizeof(uint8_t)));
@@ -458,20 +460,20 @@ inline int createSumsNoShift(int z, T* currSumPtr, T* newSumPtr)
 
 		vectorOrAssignment(newSumPtr, fromSum);
 		newSumPtr = (T*)(((uint8_t*)newSumPtr) - (sizeof(T) - sizeof(uint8_t)));
-
-		z -= (bitsCount<T>() - bitsCount<uint8_t>());
-	} while (z >= bitsCount<T>());
+	}
 	vectorOrAssignment(newSumPtr, nextSet);
 
-	z -= (bitsCount<T>() - bitsCount<uint8_t>());
+	z -= (loops + 1) * (bitsCount<T>() - bitsCount<uint8_t>());
 	return z;
 }
 
 template<typename T>
 inline int createSumsShiftRight(int z, T* currSumPtr, T* newSumPtr, int rightShift)
 {
+	int loops = (z / (bitsCount<T>() - bitsCount<uint8_t>())) - 1;
+
 	T nextSet = vectorLoadShiftRight(currSumPtr, rightShift);
-	do
+	for (int i = 0; i < loops; i++)
 	{
 		T fromSum = nextSet;
 		currSumPtr = (T*)(((uint8_t*)currSumPtr) - (sizeof(T) - sizeof(uint8_t)));
@@ -479,12 +481,10 @@ inline int createSumsShiftRight(int z, T* currSumPtr, T* newSumPtr, int rightShi
 
 		vectorOrAssignment(newSumPtr, fromSum);
 		newSumPtr = (T*)(((uint8_t*)newSumPtr) - (sizeof(T) - sizeof(uint8_t)));
-
-		z -= (bitsCount<T>() - bitsCount<uint8_t>());
-	} while (z >= bitsCount<T>());
+	}
 	vectorOrAssignment(newSumPtr, nextSet);
 
-	z -= (bitsCount<T>() - bitsCount<uint8_t>());
+	z -= (loops + 1) * (bitsCount<T>() - bitsCount<uint8_t>());
 	return z;
 }
 

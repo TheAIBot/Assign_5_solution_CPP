@@ -95,17 +95,23 @@ struct bitArraySlim
 private:
 	uint8_t* array;
 	int arrayLength;
+	int realBitLength;
 public:
 	int length;
 
-	bitArraySlim(int len)
+	bitArraySlim(int len, int realLen)
 	{
 		length = len;
-		arrayLength = (length / 8) + 1;
+		realBitLength = realLen;
+		arrayLength = (realBitLength / 8) + 1;
 		array = new uint8_t[arrayLength]();
 	}
 
-	void copyTo(bitArraySlim& other) const
+	bitArraySlim(int len) : bitArraySlim(len, len)
+	{
+	}
+
+	__declspec(noinline) void copyTo(bitArraySlim& other) const
 	{
 		std::copy(array, array + arrayLength, other.array);
 	}
@@ -142,6 +148,12 @@ public:
 		int bitIndex = index & 0b0000'0111;
 
 		array[byteIndex] ^= (-value ^ array[byteIndex]) & (1 << bitIndex);
+	}
+
+	void reuse(int newLength)
+	{
+		std::memset(array, 0, arrayLength);
+		length = newLength;
 	}
 
 	uint8_t* begin() const
@@ -252,6 +264,40 @@ struct Result
 	}
 };
 
+struct bitArrayStorage
+{
+private:
+	std::vector<bitArraySlim*>* arrays;
+	int maxSum;
+
+public:
+	bitArrayStorage(int maxSuaam)
+	{
+		arrays = new std::vector<bitArraySlim*>();
+		maxSum = maxSuaam;
+	}
+
+	bitArraySlim* pop(int length)
+	{
+		if (arrays->empty())
+		{
+			return new bitArraySlim(length, maxSum + 1);
+		}
+		else
+		{
+			bitArraySlim* arr = arrays->back();
+			arrays->pop_back();
+			arr->reuse(length);
+			return arr;
+		}
+	}
+
+	void push(bitArraySlim* arr)
+	{
+		arrays->push_back(arr);
+	}
+};
+
 struct PartialSumsData
 {
 public:
@@ -261,8 +307,9 @@ public:
 	int sumsCount;
 	int created;
 	bitArraySlim* sums;
+	bitArrayStorage* storage;
 
-	PartialSumsData()
+	PartialSumsData(int maxSum) : storage(new bitArrayStorage(maxSum))
 	{
 		foundData = new std::unordered_set<int>();
 		datas = BestSumsData();
@@ -485,7 +532,7 @@ int tryCreateSumsVectorized(int z, int number, bitArraySlim& newSums)
 	return z;
 }
 
-bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
+bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums, bitArrayStorage* storage)
 {
 	int maxSum = currSums.size();
 	for (int i = 0; i < numbers.length; i++)
@@ -493,7 +540,7 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums)
 		maxSum += numbers[i];
 	}
 
-	bitArraySlim* newSums = new bitArraySlim(maxSum);
+	bitArraySlim* newSums = storage->pop(maxSum);
 	currSums.copyTo(*newSums);
 
 	int prevMaxSum = currSums.size() - 1;
@@ -519,7 +566,7 @@ void CreateAllSums(int number, bitArraySlim& currSums, PartialSumsData& data)
 {
 	span<int> dwa(1);
 	dwa[0] = number;
-	data.sums = CreatePartialSums(dwa, currSums);
+	data.sums = CreatePartialSums(dwa, currSums, data.storage);
 	delete[] dwa.array;
 }
 
@@ -565,16 +612,16 @@ bool CreateAllSumsDatas(span<int> numbers, bitArraySlim& currSums, PartialSumsDa
 		span<int> firstPart = numbers.slice(0, midPoint);
 		span<int> secondPart = numbers.slice(midPoint);
 
-		bitArraySlim* secondPartSums = CreatePartialSums(secondPart, currSums);
+		bitArraySlim* secondPartSums = CreatePartialSums(secondPart, currSums, data.storage);
 		if (!CreateAllSumsDatas(firstPart, *secondPartSums, data))
 		{
-			delete secondPartSums;
+			data.storage->push(secondPartSums);
 		}
 
-		bitArraySlim* firstPartSums = CreatePartialSums(firstPart, currSums);
+		bitArraySlim* firstPartSums = CreatePartialSums(firstPart, currSums, data.storage);
 		if (!CreateAllSumsDatas(secondPart, *firstPartSums, data))
 		{
-			delete firstPartSums;
+			data.storage->push(firstPartSums);
 		}
 	}
 	else
@@ -599,7 +646,7 @@ bool CreateAllSumsDatas(span<int> numbers, bitArraySlim& currSums, PartialSumsDa
 			{
 				if (data.datas.Data.bitArray != nullptr)
 				{
-					delete data.datas.Data.bitArray;
+					data.storage->push(data.datas.Data.bitArray);
 				}
 				data.datas = newData;
 				return true;
@@ -655,10 +702,16 @@ Result Solve(span<int> numbers)
 {
 	std::sort(numbers.begin(), numbers.end());
 
+	int maxSum = 0;
+	for (int i = 0; i < numbers.length; i++)
+	{
+		maxSum += numbers[i];
+	}
+
+	PartialSumsData data(maxSum);
+
 	bitArraySlim* currSums = new bitArraySlim(1);
 	currSums->forceSet(0, 1);
-
-	PartialSumsData data;
 
 	CreateAllSumsDatas(numbers, *currSums, data);
 	delete currSums;

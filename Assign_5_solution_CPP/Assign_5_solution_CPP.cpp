@@ -102,15 +102,13 @@ struct bitArraySlim
 private:
 	uint64_t* array;
 	int arrayLength;
-	int realBitLength;
 public:
 	int length;
 
 	bitArraySlim(int len, int realLen)
 	{
 		length = len;
-		realBitLength = realLen;
-		arrayLength = (realBitLength / bitsCount<uint64_t>()) + 1;
+		arrayLength = (realLen / bitsCount<uint64_t>()) + 1;
 		array = new uint64_t[arrayLength]();
 	}
 
@@ -126,11 +124,6 @@ public:
 	int size() const
 	{
 		return length;
-	}
-
-	int getActualSize() const
-	{
-		return arrayLength;
 	}
 
 	uint64_t operator[](int index) const

@@ -12,6 +12,7 @@
 #include <sstream>
 #include <cctype>
 #include <cstdint>
+#include <cstring>
 
 template<typename T>
 struct span
@@ -117,7 +118,7 @@ public:
 	{
 	}
 
-	__declspec(noinline) void copyTo(bitArraySlim& other) const
+	void copyTo(bitArraySlim& other) const
 	{
 		std::copy(array, array + arrayLength, other.array);
 	}
@@ -323,17 +324,9 @@ public:
 int BoolArrayTrueCount(bitArraySlim& array)
 {
 	int trueCount = 0;
-	int i = 0;
-
-	uint64_t* u64intArray = (uint64_t*)(array.begin());
-	for (; i < array.size() - bitsCount<uint64_t>(); i += bitsCount<uint64_t>())
+	for (auto i = array.begin(); i != array.end(); i++)
 	{
-		trueCount += _mm_popcnt_u64(u64intArray[i / bitsCount<uint64_t>()]);
-	}
-
-	for (; i < array.size(); i++)
-	{
-		trueCount += array[i];
+		trueCount += _mm_popcnt_u64(*i);
 	}
 
 	return trueCount;

@@ -346,14 +346,7 @@ void createSumsVectorized128bit(int z, int number, bitArraySlim& newSums)
 	lastPtr += rest;
 	currPtr += rest;
 
-	if (numberOffset.bitIndex == 0)
-	{
-		for (int i = 0; i <= iterations; i += sizeFromUint)
-		{
-			_mm_storeu_si128((__m128i*)(lastPtr - i), _mm_or_si128(_mm_loadu_si128((__m128i*)(lastPtr - i)), _mm_loadu_si128((__m128i*)(currPtr - i))));
-		}
-	}
-	else if (numberOffset.bitIndex % bitsCount<uint8_t>() == 0)
+	if (numberOffset.bitIndex % bitsCount<uint8_t>() == 0)
 	{
 		int offset = numberOffset.bitIndex / bitsCount<uint8_t>();
 		lastPtr = (uint64_t*)(((uint8_t*)lastPtr) + offset);
@@ -366,7 +359,7 @@ void createSumsVectorized128bit(int z, int number, bitArraySlim& newSums)
 	}
 	else
 	{
-		for (int i = 0; i < iterations; i += sizeFromUint)
+		for (int i = 1; i < iterations + 1; i += sizeFromUint)
 		{
 			__m128i unalignedPart = _mm_loadu_si128((__m128i*)(currPtr - i - 1));
 			__m128i before = _mm_srli_epi64(unalignedPart, bitsCount<uint64_t>() - numberOffset.bitIndex);
@@ -375,16 +368,8 @@ void createSumsVectorized128bit(int z, int number, bitArraySlim& newSums)
 			_mm_storeu_si128((__m128i*)(lastPtr - i), _mm_or_si128(_mm_loadu_si128((__m128i*)(lastPtr - i)), combined));
 		}
 
-		lastPtr -= iterations - 1;
-		currPtr -= iterations - 1;
-
-		uint64_t before = currPtr[-1] >> (bitsCount<uint64_t>() - numberOffset.bitIndex);
-		uint64_t after = currPtr[0] << numberOffset.bitIndex;
-		uint64_t combined = before | after;
-		lastPtr[0] |= combined;
-
-		lastPtr--;
-		currPtr--;
+		lastPtr -= iterations;
+		currPtr -= iterations;
 
 		uint64_t affter = currPtr[0] << numberOffset.bitIndex;
 		lastPtr[0] |= affter;
@@ -400,14 +385,7 @@ void createSumsVectorized64bit(int z, int number, bitArraySlim& newSums)
 	uint64_t* currPtr = lastPtr - numberOffset.byteIndex;
 
 	int iterations = length - numberOffset.byteIndex;
-	if (numberOffset.bitIndex == 0)
-	{
-		for (int i = 0; i <= iterations; i++)
-		{
-			lastPtr[-i] |= currPtr[-i];
-		}
-	}
-	else if (numberOffset.bitIndex % bitsCount<uint8_t>() == 0)
+	if (numberOffset.bitIndex % bitsCount<uint8_t>() == 0)
 	{
 		int offset = numberOffset.bitIndex / bitsCount<uint8_t>();
 		lastPtr = (uint64_t*)(((uint8_t*)lastPtr) + offset);

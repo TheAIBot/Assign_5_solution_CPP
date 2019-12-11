@@ -368,11 +368,8 @@ void createSumsVectorized128bit(int z, int number, bitArraySlim& newSums)
 			_mm_storeu_si128((__m128i*)(lastPtr - i), _mm_or_si128(_mm_loadu_si128((__m128i*)(lastPtr - i)), combined));
 		}
 
-		lastPtr -= iterations;
-		currPtr -= iterations;
-
-		uint64_t affter = currPtr[0] << numberOffset.bitIndex;
-		lastPtr[0] |= affter;
+		uint64_t affter = currPtr[-iterations] << numberOffset.bitIndex;
+		lastPtr[-iterations] |= affter;
 	}
 }
 
@@ -406,11 +403,8 @@ void createSumsVectorized64bit(int z, int number, bitArraySlim& newSums)
 			lastPtr[-i] |= combined;
 		}
 
-		lastPtr -= iterations;
-		currPtr -= iterations;
-
-		uint64_t after = currPtr[0] << numberOffset.bitIndex;
-		lastPtr[0] |= after;
+		uint64_t affter = currPtr[-iterations] << numberOffset.bitIndex;
+		lastPtr[-iterations] |= affter;
 	}
 }
 

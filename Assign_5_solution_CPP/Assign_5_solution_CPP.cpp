@@ -335,25 +335,36 @@ void createSumsVectorized128bit(int z, int number, bitArraySlim& newSums)
 	bitIndices<uint64_t> numberOffset(number);
 
 	int length = ((z + number) / bitsCount<uint64_t>());
-	uint64_t* sumsPtr = newSums.begin();
-	uint64_t* lastPtr = sumsPtr + length;
+	uint64_t* lastPtr = newSums.begin() + length;
 	uint64_t* currPtr = lastPtr - numberOffset.byteIndex;
-
-	//for (int i = 0; i < newSums.length; i++)
-	//{
-	//	if (newSums[i])
-	//	{
-	//		std::cout << i << " ";
-	//	}
-	//}
-	//std::cout << std::endl;
 
 	int sizeFromUint = sizeof(__m128i) / sizeof(uint64_t);
 
 	int iterations = length - numberOffset.byteIndex;
-	//iterations += sizeFromUint - (iterations % sizeFromUint);
-	iterations -= iterations % sizeFromUint;
-	if (numberOffset.bitIndex != 0)
+	int rest = iterations % sizeFromUint;
+	iterations += rest;
+	lastPtr += rest;
+	currPtr += rest;
+
+	if (numberOffset.bitIndex == 0)
+	{
+		for (int i = 0; i <= iterations; i += sizeFromUint)
+		{
+			_mm_storeu_si128((__m128i*)(lastPtr - i), _mm_or_si128(_mm_loadu_si128((__m128i*)(lastPtr - i)), _mm_loadu_si128((__m128i*)(currPtr - i))));
+		}
+	}
+	else if (numberOffset.bitIndex % bitsCount<uint8_t>() == 0)
+	{
+		int offset = numberOffset.bitIndex / bitsCount<uint8_t>();
+		lastPtr = (uint64_t*)(((uint8_t*)lastPtr) + offset);
+		currPtr = (uint64_t*)(((uint8_t*)currPtr));
+
+		for (int i = 0; i <= iterations; i += sizeFromUint)
+		{
+			_mm_storeu_si128((__m128i*)(lastPtr - i), _mm_or_si128(_mm_loadu_si128((__m128i*)(lastPtr - i)), _mm_loadu_si128((__m128i*)(currPtr - i))));
+		}
+	}
+	else
 	{
 		for (int i = 0; i < iterations; i += sizeFromUint)
 		{
@@ -363,38 +374,51 @@ void createSumsVectorized128bit(int z, int number, bitArraySlim& newSums)
 			__m128i combined = _mm_or_si128(before, after);
 			_mm_storeu_si128((__m128i*)(lastPtr - i), _mm_or_si128(_mm_loadu_si128((__m128i*)(lastPtr - i)), combined));
 		}
-		__m128i after = _mm_slli_epi64(*((__m128i*)sumsPtr), numberOffset.bitIndex);
-		_mm_storeu_si128((__m128i*)(sumsPtr + numberOffset.byteIndex), _mm_or_si128(_mm_loadu_si128((__m128i*)(sumsPtr + numberOffset.byteIndex)), after));
-	}
-	else
-	{
-		for (int i = 0; i <= iterations; i += 2)
-		{
-			_mm_storeu_si128((__m128i*)(lastPtr - i), _mm_or_si128(_mm_loadu_si128((__m128i*)(lastPtr - i)), _mm_loadu_si128((__m128i*)(currPtr - i))));
-		}
-	}
 
-	//for (int i = 0; i < newSums.length; i++)
-	//{
-	//	if (newSums[i])
-	//	{
-	//		std::cout << i << " ";
-	//	}
-	//}
-	//std::cout << std::endl;
+		lastPtr -= iterations - 1;
+		currPtr -= iterations - 1;
+
+		uint64_t before = currPtr[-1] >> (bitsCount<uint64_t>() - numberOffset.bitIndex);
+		uint64_t after = currPtr[0] << numberOffset.bitIndex;
+		uint64_t combined = before | after;
+		lastPtr[0] |= combined;
+
+		lastPtr--;
+		currPtr--;
+
+		uint64_t affter = currPtr[0] << numberOffset.bitIndex;
+		lastPtr[0] |= affter;
+	}
 }
 
-__declspec(noinline) void createSumsVectorized64bit(int z, int number, bitArraySlim& newSums)
+void createSumsVectorized64bit(int z, int number, bitArraySlim& newSums)
 {
 	bitIndices<uint64_t> numberOffset(number);
 
 	int length = ((z + number) / bitsCount<uint64_t>());
-	uint64_t* sumsPtr = newSums.begin();
-	uint64_t* lastPtr = sumsPtr + length;
+	uint64_t* lastPtr = newSums.begin() + length;
 	uint64_t* currPtr = lastPtr - numberOffset.byteIndex;
 
 	int iterations = length - numberOffset.byteIndex;
-	if (numberOffset.bitIndex != 0)
+	if (numberOffset.bitIndex == 0)
+	{
+		for (int i = 0; i <= iterations; i++)
+		{
+			lastPtr[-i] |= currPtr[-i];
+		}
+	}
+	else if (numberOffset.bitIndex % bitsCount<uint8_t>() == 0)
+	{
+		int offset = numberOffset.bitIndex / bitsCount<uint8_t>();
+		lastPtr = (uint64_t*)(((uint8_t*)lastPtr) + offset);
+		currPtr = (uint64_t*)(((uint8_t*)currPtr));
+
+		for (int i = 0; i <= iterations; i++)
+		{
+			lastPtr[-i] |= currPtr[-i];
+		}
+	}
+	else
 	{
 		for (int i = 0; i < iterations; i++)
 		{
@@ -403,15 +427,12 @@ __declspec(noinline) void createSumsVectorized64bit(int z, int number, bitArrayS
 			uint64_t combined = before | after;
 			lastPtr[-i] |= combined;
 		}
-		uint64_t after = sumsPtr[0] << numberOffset.bitIndex;
-		sumsPtr[numberOffset.byteIndex] |= after;
-	}
-	else
-	{
-		for (int i = 0; i <= iterations; i++)
-		{
-			lastPtr[-i] |= currPtr[-i];
-		}
+
+		lastPtr -= iterations;
+		currPtr -= iterations;
+
+		uint64_t after = currPtr[0] << numberOffset.bitIndex;
+		lastPtr[0] |= after;
 	}
 }
 
@@ -429,8 +450,8 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums, bitAr
 	int prevMaxSum = currSums.size() - 1;
 	for (int i = 0; i < numbers.length; i++)
 	{
-		//createSumsVectorized128bit(prevMaxSum, numbers[i], *newSums);
-		createSumsVectorized64bit(prevMaxSum, numbers[i], *newSums);
+		createSumsVectorized128bit(prevMaxSum, numbers[i], *newSums);
+		//createSumsVectorized64bit(prevMaxSum, numbers[i], *newSums);
 		prevMaxSum += numbers[i];
 	}
 

@@ -350,7 +350,6 @@ void createSumsVectorized128bit(int z, int number, bitArraySlim& newSums)
 	{
 		int offset = numberOffset.bitIndex / bitsCount<uint8_t>();
 		lastPtr = (uint64_t*)(((uint8_t*)lastPtr) + offset);
-		currPtr = (uint64_t*)(((uint8_t*)currPtr));
 
 		for (int i = 0; i <= iterations; i += sizeFromUint)
 		{
@@ -386,7 +385,6 @@ void createSumsVectorized64bit(int z, int number, bitArraySlim& newSums)
 	{
 		int offset = numberOffset.bitIndex / bitsCount<uint8_t>();
 		lastPtr = (uint64_t*)(((uint8_t*)lastPtr) + offset);
-		currPtr = (uint64_t*)(((uint8_t*)currPtr));
 
 		for (int i = 0; i <= iterations; i++)
 		{
@@ -528,20 +526,17 @@ Result CreateCollisionAvoidanceArray(bitArraySlim& sums, BestSumsData bestData, 
 {
 	SumsData sumData = bestData.Data.ToSumsData(bestData.Number, data.sumsCount);
 
-	for (auto q = sumData.Uniques->begin(); q != sumData.Uniques->end(); q++)
+	for (auto uniqueNumber = sumData.Uniques->begin(); uniqueNumber != sumData.Uniques->end(); uniqueNumber++)
 	{
-		int uniqueNumber = *q;
-		sums.forceSet(uniqueNumber, 0);
+		sums.forceSet(*uniqueNumber, 0);
 	}
 
 	for (int i = 1; i <= sums.size();)
 	{
 		bool foundObstacle = false;
-		for (auto q = sumData.NewSums->begin(); q != sumData.NewSums->end(); q++)
+		for (auto newSum = sumData.NewSums->begin(); newSum != sumData.NewSums->end(); newSum++)
 		{
-			int newSum = *q;
-
-			int overlapIndex = newSum - (bestData.Number - i);
+			int overlapIndex = *newSum - (bestData.Number - i);
 			int offset = 0;
 			while (overlapIndex + offset < sums.size() && sums[overlapIndex + offset] == 1)
 			{

@@ -326,6 +326,48 @@ int BoolArrayTrueCount(bitArraySlim& array)
 	return trueCount;
 }
 
+void createSumsVectorized256bit(int z, int number, bitArraySlim& newSums)
+{
+	bitIndices<uint64_t> numberOffset(number);
+
+	int length = ((z + number) / bitsCount<uint64_t>());
+	uint64_t* lastPtr = newSums.begin() + length;
+	uint64_t* currPtr = lastPtr - numberOffset.byteIndex;
+
+	int sizeFromUint = sizeof(__m256i) / sizeof(uint64_t);
+
+	int iterations = length - numberOffset.byteIndex;
+	int rest = (sizeFromUint - (iterations % sizeFromUint)) % sizeFromUint;
+	iterations += rest;
+	lastPtr += rest;
+	currPtr += rest;
+
+	if (numberOffset.bitIndex % bitsCount<uint8_t>() == 0)
+	{
+		int offset = numberOffset.bitIndex / bitsCount<uint8_t>();
+		lastPtr = (uint64_t*)(((uint8_t*)lastPtr) + offset);
+
+		for (int i = 0; i <= iterations; i += sizeFromUint)
+		{
+			_mm256_storeu_si256((__m256i*)(lastPtr - i), _mm256_or_si256(_mm256_loadu_si256((__m256i*)(lastPtr - i)), _mm256_loadu_si256((__m256i*)(currPtr - i))));
+		}
+	}
+	else
+	{
+		for (int i = -1; i <= iterations - 1; i += sizeFromUint)
+		{
+			__m256i unalignedPart = _mm256_loadu_si256((__m256i*)(currPtr - i - 1));
+			__m256i before = _mm256_srli_epi64(unalignedPart, bitsCount<uint64_t>() - numberOffset.bitIndex);
+			__m256i after = _mm256_slli_epi64(_mm256_loadu_si256((__m256i*)(currPtr - i)), numberOffset.bitIndex);
+			__m256i combined = _mm256_or_si256(before, after);
+			_mm256_storeu_si256((__m256i*)(lastPtr - i), _mm256_or_si256(_mm256_loadu_si256((__m256i*)(lastPtr - i)), combined));
+		}
+
+		uint64_t affter = currPtr[-iterations] << numberOffset.bitIndex;
+		lastPtr[-iterations] |= affter;
+	}
+}
+
 void createSumsVectorized128bit(int z, int number, bitArraySlim& newSums)
 {
 	bitIndices<uint64_t> numberOffset(number);
@@ -337,7 +379,7 @@ void createSumsVectorized128bit(int z, int number, bitArraySlim& newSums)
 	int sizeFromUint = sizeof(__m128i) / sizeof(uint64_t);
 
 	int iterations = length - numberOffset.byteIndex;
-	int rest = iterations % sizeFromUint;
+	int rest = (sizeFromUint - (iterations % sizeFromUint)) % sizeFromUint;
 	iterations += rest;
 	lastPtr += rest;
 	currPtr += rest;
@@ -354,7 +396,7 @@ void createSumsVectorized128bit(int z, int number, bitArraySlim& newSums)
 	}
 	else
 	{
-		for (int i = 1; i < iterations + 1; i += sizeFromUint)
+		for (int i = -1; i <= iterations - 1; i += sizeFromUint)
 		{
 			__m128i unalignedPart = _mm_loadu_si128((__m128i*)(currPtr - i - 1));
 			__m128i before = _mm_srli_epi64(unalignedPart, bitsCount<uint64_t>() - numberOffset.bitIndex);
@@ -416,7 +458,8 @@ bitArraySlim* CreatePartialSums(span<int> numbers, bitArraySlim& currSums, bitAr
 	int prevMaxSum = currSums.size() - 1;
 	for (int i = 0; i < numbers.length; i++)
 	{
-		createSumsVectorized128bit(prevMaxSum, numbers[i], *newSums);
+		createSumsVectorized256bit(prevMaxSum, numbers[i], *newSums);
+		//createSumsVectorized128bit(prevMaxSum, numbers[i], *newSums);
 		//createSumsVectorized64bit(prevMaxSum, numbers[i], *newSums);
 		prevMaxSum += numbers[i];
 	}

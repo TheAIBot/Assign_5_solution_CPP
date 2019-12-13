@@ -114,7 +114,7 @@ public:
 		arrayLength = (realLen / bitsCount<__m256i>()) + 2;
 		arrayLength *= sizeof(__m256i) / sizeof(uint64_t);
 		array = (uint64_t*)_mm_malloc(arrayLength * sizeof(uint64_t), sizeof(__m256i));
-		std::memset(array, 0, arrayLength * sizeof(uint64_t));
+		std::fill(array, array + arrayLength, 0);
 	}
 
 	bitArraySlim(int len) : bitArraySlim(len, len)
@@ -123,7 +123,10 @@ public:
 
 	void copyTo(bitArraySlim& other) const
 	{
-		std::copy(array, array + arrayLength, other.array);
+		int copyLength = (length / bitsCount<uint64_t>()) + 1;
+		int fillLength = other.arrayLength - copyLength;
+		std::copy(array, array + copyLength, other.array);
+		std::fill(other.array + copyLength, other.end(), 0);
 	}
 
 	int size() const
@@ -137,12 +140,6 @@ public:
 		return (array[indices.byteIndex] >> indices.bitIndex) & 1;
 	}
 
-	void set(int index, uint64_t value)
-	{
-		bitIndices<uint64_t> indices(index);
-		array[indices.byteIndex] |= value << indices.bitIndex;
-	}
-
 	void forceSet(int index, uint64_t value)
 	{
 		bitIndices<uint64_t> indices(index);
@@ -151,7 +148,6 @@ public:
 
 	void reuse(int newLength)
 	{
-		std::memset(array, 0, arrayLength * sizeof(uint64_t));
 		length = newLength;
 	}
 

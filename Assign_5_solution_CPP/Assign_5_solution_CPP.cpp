@@ -100,6 +100,12 @@ public:
 	}
 };
 
+template<typename T1, typename T2>
+int getSizeDiff()
+{
+	return sizeof(T1) / sizeof(T2);
+}
+
 struct bitArraySlim
 {
 private:
@@ -111,8 +117,8 @@ public:
 	bitArraySlim(int len, int realLen)
 	{
 		length = len;
-		arrayLength = (realLen / bitsCount<__m256i>()) + 2;
-		arrayLength *= sizeof(__m256i) / sizeof(uint64_t);
+		arrayLength = (realLen / bitsCount<__m256i>()) + 1 + 1;
+		arrayLength *= getSizeDiff<__m256i, uint64_t>();
 		array = (uint64_t*)_mm_malloc(arrayLength * sizeof(uint64_t), sizeof(__m256i));
 		std::fill(array, array + arrayLength, 0);
 	}
@@ -123,10 +129,13 @@ public:
 
 	void copyTo(bitArraySlim& other) const
 	{
-		int copyLength = (length / bitsCount<uint64_t>()) + 1;
-		int fillLength = other.arrayLength - copyLength;
+		int copyLength = getCurrentArrayLength();
+		int fillLength = other.getCurrentArrayLength() - copyLength;
 		std::copy(array, array + copyLength, other.array);
-		std::fill(other.array + copyLength, other.end(), 0);
+
+		uint64_t* fillStart = other.array + copyLength;
+		uint64_t* fillEnd = other.array + copyLength + fillLength + getSizeDiff<__m256i, uint64_t>();
+		std::fill(fillStart, fillEnd, 0);
 	}
 
 	int size() const
@@ -149,6 +158,16 @@ public:
 	void reuse(int newLength)
 	{
 		length = newLength;
+	}
+
+	int getCurrentArrayLength() const
+	{
+		int len = (length / bitsCount<uint64_t>());
+		if (length % bitsCount<uint64_t>() != 0)
+		{
+			len++;
+		}
+		return len;
 	}
 
 	uint64_t* begin() const
@@ -318,7 +337,7 @@ public:
 int BoolArrayTrueCount(bitArraySlim& array)
 {
 	int trueCount = 0;
-	for (auto i = array.begin(); i != array.end(); i++)
+	for (auto i = array.begin(); i != array.begin() + array.getCurrentArrayLength(); i++)
 	{
 		trueCount += _mm_popcnt_u64(*i);
 	}

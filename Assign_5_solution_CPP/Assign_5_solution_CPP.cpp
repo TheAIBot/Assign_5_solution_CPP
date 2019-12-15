@@ -106,6 +106,18 @@ int getSizeDiff()
 	return sizeof(T1) / sizeof(T2);
 }
 
+template<typename T>
+int getItemsNeededForBits(int length)
+{
+	int len = length / bitsCount<T>();
+	if (length % bitsCount<T>() != 0)
+	{
+		len++;
+	}
+
+	return len;
+}
+
 struct bitArraySlim
 {
 private:
@@ -117,7 +129,7 @@ public:
 	bitArraySlim(int len, int realLen)
 	{
 		length = len;
-		arrayLength = (realLen / bitsCount<__m256i>()) + 1 + 1;
+		arrayLength = getItemsNeededForBits<__m256i>(realLen) + 1;
 		arrayLength *= getSizeDiff<__m256i, uint64_t>();
 		array = (uint64_t*)_mm_malloc(arrayLength * sizeof(uint64_t), sizeof(__m256i));
 		std::fill(array, array + arrayLength, 0);
@@ -162,12 +174,7 @@ public:
 
 	int getCurrentArrayLength() const
 	{
-		int len = (length / bitsCount<uint64_t>());
-		if (length % bitsCount<uint64_t>() != 0)
-		{
-			len++;
-		}
-		return len;
+		return getItemsNeededForBits<uint64_t>(length);
 	}
 
 	uint64_t* begin() const

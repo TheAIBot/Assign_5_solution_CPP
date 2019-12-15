@@ -122,14 +122,13 @@ struct bitArraySlim
 {
 private:
 	uint64_t* array;
-	int arrayLength;
 public:
 	int length;
 
 	bitArraySlim(int len, int realLen)
 	{
 		length = len;
-		arrayLength = getItemsNeededForBits<__m256i>(realLen) + 1;
+		int arrayLength = getItemsNeededForBits<__m256i>(realLen) + 1;
 		arrayLength *= getSizeDiff<__m256i, uint64_t>();
 		array = (uint64_t*)_mm_malloc(arrayLength * sizeof(uint64_t), sizeof(__m256i));
 		std::fill(array, array + arrayLength, 0);
@@ -180,11 +179,6 @@ public:
 	uint64_t* begin() const
 	{
 		return array;
-	}
-
-	uint64_t* end() const
-	{
-		return array + arrayLength;
 	}
 
 	~bitArraySlim()
